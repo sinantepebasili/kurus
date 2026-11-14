@@ -9,6 +9,8 @@
 //   "Telefon 36000 3t" / "Tablet 12000 üç taksit"  → 3 taksit, başlık "Telefon" / "Tablet"
 //   "Laptop 1,200.00 in 4 installments"    → 4 × 300 · "Laptop"
 //   "Coffee 5 yesterday" / "Kahve 145 dün" → dünün tarihiyle
+//   Sesli dikte: "Coffee five dollars" → 5 · "Coffee five cents" → 0,05 · "Cinema one dollar one" → 1, "Cinema"
+//                "Kahve yüz kırk beş lira" → 145 · "Market iki yüz" → 200
 //   "+Maaş 65000", "İade +450", "+Salary 5000", "Refund +120" → Gelir
 //   "4532 ile biten Bonus kartınızla MIGROS işyerinde 642,50 TL harcama yapılmıştır."
 //                                          → Migros · ₺642,50 · Bonus ••4532 · Market
@@ -127,14 +129,24 @@ enum ExpenseParser {
         let isIncome = incomeBySign || incomeByWord
         if isIncome { result.installmentCount = 1 }
 
-        // 5) Tutar ve para birimi — önce para birimiyle etiketli olan ("642,50 TL", "$14.50",
-        //    "USD 25.00", "EUR 40", "£12.99", "5 dollars"), yoksa en büyük sayı.
+        // 5) Tutar ve para birimi. Öncelik sırası:
+        //    a) rakamla + para birimi etiketli ("642,50 TL", "$14.50", "USD 25.00", "5 dollars")
+        //    b) yazıyla + para birimi etiketli — sesli dikte ("five dollars", "yüz kırk beş lira", "five cents")
+        //    c) rakamla, etiketsiz → en büyük sayı ("Kahve 145")
+        //    d) yazıyla, etiketsiz — metinde hiç rakam yoksa ("Coffee five", "Market iki yüz")
         let candidates: [Candidate] = matches(Patterns.number, in: working).compactMap { m in
             guard let g = m.group(1), let value = decimal(from: String(working[g])), value > 0 else { return nil }
             let tag = currencyTag(for: m.whole, in: working)
             return Candidate(value: value, currency: tag?.code, range: tag?.range ?? m.whole)
         }
-        if let chosen = candidates.first(where: { $0.currency != nil }) ?? candidates.max(by: { $0.value < $1.value }) {
+        let taggedDigits = candidates.first(where: { $0.currency != nil })
+        let spoken = taggedDigits == nil ? extractSpokenAmount(from: working) : nil
+
+        if let spoken, spoken.isTagged || candidates.isEmpty {
+            result.amount = spoken.value
+            result.currencyCode = spoken.currency
+            working = spoken.cleaned
+        } else if let chosen = taggedDigits ?? candidates.max(by: { $0.value < $1.value }) {
             result.amount = chosen.value
             if let code = chosen.currency, code != Money.homeCurrency {
                 result.currencyCode = code
@@ -174,7 +186,7 @@ enum ExpenseParser {
         } else {
             // Kategori, taksit/kart/tutar ayıklanmış metinden çıkarılır: "3 taksit" içindeki
             // "taksi" önekinin Ulaşım'a düşmesi böylece engellenir.
-            result.category = brand?.category ?? inferCategory(working.kurusNormalized) ?? .other
+            result.category = brand?.category ?? inferCategory(working) ?? .other
             result.isRecurring = (brand?.isSubscription ?? false)
                 || SmartCategoryMatcher.matches(tokens: normTokens, keywords: Patterns.recurringWords)
         }
@@ -186,12 +198,183 @@ enum ExpenseParser {
 
     // MARK: Kategori çıkarımı
 
-    private static func inferCategory(_ norm: String) -> ExpenseCategory? {
-        let tokens = SmartCategoryMatcher.tokens(norm)
-        for rule in Patterns.categoryRules where SmartCategoryMatcher.matches(tokens: tokens, keywords: rule.keywords) {
+    private static func inferCategory(_ text: String) -> ExpenseCategory? {
+        let tokens = SmartCategoryMatcher.tokens(text.kurusNormalized)
+        // "=" ile başlayan anahtar kelimeler için aksanı korunmuş küçük harfli token'lar ("maç" ≠ "mac")
+        let accentTokens = SmartCategoryMatcher.tokens(text.lowercased())
+        for rule in Patterns.categoryRules
+        where SmartCategoryMatcher.matches(tokens: tokens, keywords: rule.keywords, accentTokens: accentTokens) {
             return rule.category
         }
         return nil
+    }
+
+    // MARK: Dikte ile yazılı tutar (TR + EN)
+
+    /// Sayı kelimeleri (normalize): değer < 100
+    private static let numberWords: [String: Int] = [
+        // Türkçe
+        "bir": 1, "iki": 2, "uc": 3, "dort": 4, "bes": 5, "alti": 6, "yedi": 7, "sekiz": 8, "dokuz": 9,
+        "on": 10, "yirmi": 20, "otuz": 30, "kirk": 40, "elli": 50, "altmis": 60, "yetmis": 70,
+        "seksen": 80, "doksan": 90,
+        // English
+        "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9,
+        "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15,
+        "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20, "thirty": 30,
+        "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90,
+    ]
+    private static let hundredWords: Set<String> = ["yuz", "hundred"]
+    private static let thousandWords: Set<String> = ["bin", "thousand"]
+    private static let turkishUnits: Set<String> = ["bir", "iki", "uc", "dort", "bes", "alti", "yedi", "sekiz", "dokuz"]
+
+    /// Ana birim kelimeleri → ISO kod ("dollars", "bucks", "lira", "tl", "euro"…)
+    private static func majorCurrency(_ word: String) -> String? {
+        Money.trailingWords[word] ?? Money.codes[word] ?? (word == "buck" ? "USD" : nil)
+    }
+
+    /// Alt birim kelimeleri → ISO kod. "cent" ana para birimi USD/EUR ise onu, değilse USD'yi kullanır.
+    private static func subunitCurrency(_ word: String) -> String? {
+        switch word {
+        case "cent", "cents":
+            return ["USD", "EUR"].contains(Money.homeCurrency) ? Money.homeCurrency : "USD"
+        case "kurus": return "TRY"
+        case "penny", "pence": return "GBP"
+        default: return nil
+        }
+    }
+
+    private enum NumberWord: Equatable {
+        case value(Int), hundred, thousand, connector, article
+    }
+
+    struct SpokenAmount: Equatable {
+        let value: Decimal
+        /// Ana para biriminden farklıysa ISO kod, değilse `nil`
+        let currency: String?
+        /// Bir para birimi kelimesine bağlı mı ("five dollars")
+        let isTagged: Bool
+        /// Sayı ve para birimi kelimeleri çıkarılmış metin
+        let cleaned: String
+    }
+
+    /// Yazıyla söylenmiş tutarı bulur:
+    /// "Coffee five dollars" → 5 · "Coffee five cents" → 0,05 · "two dollars fifty cents" → 2,50
+    /// "Kahve yüz kırk beş lira" → 145 · "Market iki yüz" → 200 · "Cinema one dollar one" → 1 ("Cinema")
+    static func extractSpokenAmount(from text: String) -> SpokenAmount? {
+        // Tireli birleşikleri ayır: "twenty-five" → "twenty", "five"
+        var raw: [String] = []
+        for token in text.split(whereSeparator: \.isWhitespace).map(String.init) {
+            let parts = token.split(separator: "-").map(String.init)
+            if parts.count > 1, parts.allSatisfy({ numberWords[$0.kurusNormalized.trimmingCharacters(in: .punctuationCharacters)] != nil }) {
+                raw.append(contentsOf: parts)
+            } else {
+                raw.append(token)
+            }
+        }
+        let words = raw.map { $0.kurusNormalized.trimmingCharacters(in: .punctuationCharacters) }
+        let count = words.count
+        guard count > 0 else { return nil }
+
+        func isCurrencyWord(_ i: Int) -> Bool {
+            i < count && (majorCurrency(words[i]) != nil || subunitCurrency(words[i]) != nil)
+        }
+
+        // Sözcük türleri
+        var kinds: [NumberWord?] = words.map { word in
+            if let v = numberWords[word] { return .value(v) }
+            if hundredWords.contains(word) { return .hundred }
+            if thousandWords.contains(word) { return .thousand }
+            if word == "and" { return .connector }
+            if word == "a" { return .article }
+            return nil
+        }
+        // "on" hem Türkçe 10 hem İngilizce edat: yalnızca sayı bağlamında sayı sayılır
+        // ("on beş" ✓, "yüz on" ✓, "on lira" ✓ — "dinner on me" ✗, "twenty on lunch" ✗)
+        for i in 0..<count where words[i] == "on" {
+            let afterHundred = i > 0 && (words[i - 1] == "yuz" || words[i - 1] == "bin")
+            let beforeUnit = i + 1 < count && turkishUnits.contains(words[i + 1])
+            let beforeCurrency = isCurrencyWord(i + 1)
+            let loneTurkish = AppLanguage.isTurkish && i == count - 1 && (i == 0 || kinds[i - 1] == nil)
+            if !(afterHundred || beforeUnit || beforeCurrency || loneTurkish) { kinds[i] = nil }
+        }
+
+        func isNumeric(_ i: Int) -> Bool {
+            guard i < count, let kind = kinds[i] else { return false }
+            switch kind {
+            case .value, .hundred, .thousand: return true
+            default: return false
+            }
+        }
+
+        // Ardışık sayı kelimelerini koşulara (run) ayır
+        struct Run { var start: Int; var end: Int; var value: Int; var consumedEnd: Int; var amount: Decimal; var currency: String?; var tagged: Bool }
+        var runs: [Run] = []
+        var i = 0
+        while i < count {
+            let startsWithArticle = kinds[i] == .article && (i + 1 < count && (kinds[i + 1] == .hundred || kinds[i + 1] == .thousand))
+            guard isNumeric(i) || startsWithArticle else { i += 1; continue }
+            var j = i + 1
+            while j < count {
+                if isNumeric(j) { j += 1; continue }
+                if kinds[j] == .connector, isNumeric(j + 1) { j += 1; continue }
+                break
+            }
+            // Değer: "iki yüz" = 2×100, "bin iki yüz" = 1000+200, "twenty five" = 25
+            var total = 0
+            var current = 0
+            for k in i..<j {
+                switch kinds[k] {
+                case .value(let v)?: current += v
+                case .hundred?: current = max(current, 1) * 100
+                case .thousand?: total += max(current, 1) * 1000; current = 0
+                default: break
+                }
+            }
+            let value = total + current
+            var run = Run(start: i, end: j, value: value, consumedEnd: j, amount: Decimal(value), currency: nil, tagged: false)
+
+            // Para birimi: "five dollars" · "five cents" · "two dollars (and) fifty cents"
+            if j < count, let code = majorCurrency(words[j]) {
+                run.currency = code
+                run.tagged = true
+                run.consumedEnd = j + 1
+                var k = j + 1
+                if k < count, kinds[k] == .connector { k += 1 }
+                if isNumeric(k) {
+                    var m = k
+                    var cents = 0
+                    while m < count, isNumeric(m) {
+                        if case .value(let v)? = kinds[m] { cents += v }
+                        m += 1
+                    }
+                    if m < count, subunitCurrency(words[m]) != nil, cents < 100 {
+                        run.amount += Decimal(cents) / 100
+                        run.consumedEnd = m + 1
+                    }
+                }
+            } else if j < count, let code = subunitCurrency(words[j]) {
+                run.currency = code
+                run.tagged = true
+                run.amount = Decimal(value) / 100
+                run.consumedEnd = j + 1
+            }
+
+            if value > 0 { runs.append(run) }
+            i = max(run.consumedEnd, j)
+        }
+
+        // Etiketli ilk koşu, yoksa sonuncusu ("Bir kahve otuz" → 30)
+        guard let chosen = runs.first(where: { $0.tagged }) ?? runs.last else { return nil }
+
+        // Seçilen koşu + para birimi kelimeleri ve aynı değerli dikte tekrarları ("one dollar one") çıkarılır
+        var removed = Set<Int>()
+        for run in runs where run.start == chosen.start || run.value == chosen.value {
+            removed.formUnion(run.start..<run.consumedEnd)
+        }
+        let cleaned = raw.enumerated().filter { !removed.contains($0.offset) }.map(\.element).joined(separator: " ")
+
+        let currency = chosen.currency.flatMap { $0 == Money.homeCurrency ? nil : $0 }
+        return SpokenAmount(value: chosen.amount, currency: currency, isTagged: chosen.tagged, cleaned: cleaned)
     }
 
     // MARK: Dikte ile taksit (TR + EN)
@@ -277,6 +460,7 @@ enum ExpenseParser {
             "tl", "try", "lira", "nakit", "kart", "kartla", "kartiyla", "ile",
             "taksit", "taksitle", "taksitli", "kredi", "harcama",
             "cash", "card", "installment", "installments",
+            "dollar", "dollars", "buck", "bucks", "cent", "cents",
         ]
         let bankWords = Set(Patterns.banks.map { $0.keyword }.filter { !$0.contains(" ") })
         let trimSet = CharacterSet.punctuationCharacters.union(.symbols)
@@ -581,6 +765,7 @@ private enum Patterns {
             // English
             "grocery", "groceries", "supermarket", "whole foods", "trader joes", "trader joe", "walmart",
             "target", "costco", "aldi", "lidl", "tesco", "sainsburys", "sainsbury", "kroger", "safeway",
+            "sam's club", "sams club",
         ]),
         // 5. SEYAHAT — TRAVEL
         CategoryRule(category: .travel, keywords: [
@@ -622,10 +807,13 @@ private enum Patterns {
             "subscription", "membership", "hbo", "hulu", "paramount", "peacock",
         ]),
         // 9. EĞLENCE — ENTERTAINMENT
+        // "=" öneki: aksan korunarak eşleşir — "maç" (Eğlence) ile "Mac" (Teknoloji) karışmaz.
         CategoryRule(category: .entertainment, keywords: [
             "sinema", "bilet", "konser", "tiyatro", "oyun", "bowling", "müze",
-            "maç bileti", "festival",
-            "movie", "cinema", "concert", "theater", "theatre", "tickets", "museum",
+            "=maç", "=maçı", "=maça", "=maç bileti", "festival",
+            "movie", "cinema", "concert", "theater", "theatre", "ticket", "tickets", "museum",
+            "game", "baseball", "basketball", "football", "soccer", "match", "stadium",
+            "event", "party", "bar", "pub", "club",
         ]),
         // 10. SAĞLIK & ECZANE — HEALTH
         CategoryRule(category: .health, keywords: [
@@ -650,7 +838,8 @@ private enum Patterns {
             "xiaomi", "teknosa", "mediamarkt", "media markt", "vatan bilgisayar", "itopya", "gürgençler",
             // English
             "phone", "monitor", "headphones", "charger", "cable", "console", "steam", "apple", "best buy",
-            "amazon", "keyboard", "camera",
+            "amazon", "keyboard", "camera", "computer", "pc", "desktop", "imac", "mac", "webcam",
+            "microphone", "speaker", "router", "ssd", "hard drive", "software", "app",
         ]),
         // 13. ALIŞVERİŞ: GİYİM, KİŞİSEL BAKIM, EV, EVCİL HAYVAN — SHOPPING
         CategoryRule(category: .shopping, keywords: [
@@ -679,6 +868,7 @@ private enum Patterns {
 ///   "taksi" → "taksi", "taksiye" ✓ — "taksit" ✗ · "rent" ≠ "different" · "fon" ≠ "fondöten"
 /// • Çok kelime ("ev kirası", "whole foods"): ardışık kelimeler; yalnızca son kelimeye ek izni.
 /// • Sonu "!" ile biten anahtar kelime yalnızca tam kelime olarak eşleşir.
+/// • "=" ile başlayan anahtar kelime aksan korunarak (normalize edilmeden) eşleşir: "=maç" "Mac"e uymaz.
 enum SmartCategoryMatcher {
 
     /// Önek eşleşmesinin bilinçli olarak kapalı olduğu kökler: kök → yasaklı önekler.
@@ -698,6 +888,7 @@ enum SmartCategoryMatcher {
         "water": ["waterm"],            // watermelon ≠ su faturası
         "stock": ["stocking"],          // stockings ≠ hisse
         "gold": ["golden"],             // Golden Krust ≠ altın
+        "match": ["matcha"],            // matcha latte ≠ maç
     ]
 
     static func tokens(_ normalized: String) -> [String] {
@@ -709,13 +900,18 @@ enum SmartCategoryMatcher {
         matches(tokens: tokens(text.kurusNormalized), keywords: keywords)
     }
 
-    static func matches(tokens words: [String], keywords: [String]) -> Bool {
-        keywords.contains { matches(tokens: words, keyword: $0) }
+    static func matches(tokens words: [String], keywords: [String], accentTokens: [String] = []) -> Bool {
+        keywords.contains { keyword in
+            keyword.hasPrefix("=")
+                ? matches(tokens: accentTokens, keyword: String(keyword.dropFirst()), normalize: false)
+                : matches(tokens: words, keyword: keyword)
+        }
     }
 
-    static func matches(tokens words: [String], keyword: String) -> Bool {
+    static func matches(tokens words: [String], keyword: String, normalize: Bool = true) -> Bool {
         let exact = keyword.hasSuffix("!")
-        let parts = tokens((exact ? String(keyword.dropLast()) : keyword).kurusNormalized)
+        let body = exact ? String(keyword.dropLast()) : keyword
+        let parts = tokens(normalize ? body.kurusNormalized : body.lowercased())
         guard !parts.isEmpty, words.count >= parts.count else { return false }
 
         for start in 0...(words.count - parts.count) {
