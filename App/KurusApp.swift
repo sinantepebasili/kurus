@@ -1,6 +1,6 @@
 //
 //  KurusApp.swift
-//  Kuruş — Uygulama giriş noktası ve Siri/Kestirmeler kısayolları
+//  Kuruş / Cent — Uygulama giriş noktası ve Siri/Kestirmeler kısayolları
 //
 //  Hedef: App
 //
@@ -22,17 +22,18 @@ struct KurusApp: App {
     }
 }
 
-/// "Hey Siri, Kuruş ile harcama ekle" — ve Kestirmeler galerisinde hazır eylem.
+/// "Hey Siri, log an expense in Cent" / "Kuruş ile harcama ekle".
+/// İfadelerin Türkçesi AppShortcuts.xcstrings'te; `.applicationName` yerel görünen ad (Kuruş / Cent).
 struct KurusShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: AddExpenseIntent(),
             phrases: [
-                "\(.applicationName) ile harcama ekle",
-                "\(.applicationName)’a harcama yaz",
-                "\(.applicationName) harcama",
+                "Log an expense in \(.applicationName)",
+                "Add an expense to \(.applicationName)",
+                "\(.applicationName) expense",
             ],
-            shortTitle: "Harcama Ekle",
+            shortTitle: "Add Expense",
             systemImageName: "plus.circle.fill"
         )
     }

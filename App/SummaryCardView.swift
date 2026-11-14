@@ -1,6 +1,6 @@
 //
 //  SummaryCardView.swift
-//  Kuruş — Aylık özet, ay geçişi, satır içi bütçe / gelir havuzu, harcama-birikim çubuğu,
+//  Kuruş / Cent — Aylık özet, ay geçişi, satır içi bütçe / gelir havuzu, harcama-birikim çubuğu,
 //  kart hapları, yaklaşan ödemeler ve kategori analizi girişi
 //
 //  Hedef: App
@@ -73,21 +73,21 @@ struct SummaryCardView: View {
             }
         }
         .alert(
-            "Kart Adı",
+            L("Kart Adı", "Card Name"),
             isPresented: Binding(
                 get: { renamingCard != nil },
                 set: { if !$0 { renamingCard = nil } }
             ),
             presenting: renamingCard
         ) { card in
-            TextField("Örn. Bonus Platinum", text: $renameDraft)
-            Button("Kaydet") {
+            TextField(L("Örn. Bonus Platinum", "e.g. Sapphire Reserve"), text: $renameDraft)
+            Button(L("Kaydet", "Save")) {
                 withAnimation(Theme.spring) { store.renameCard(id: card.id, to: renameDraft) }
                 Haptics.success()
             }
-            Button("Vazgeç", role: .cancel) {}
+            Button(L("Vazgeç", "Cancel"), role: .cancel) {}
         } message: { card in
-            Text(card.last4.map { "••\($0) ile biten kart" } ?? "\(card.bankName) kartı")
+            Text(card.last4.map { L("••\($0) ile biten kart", "Card ending in \($0)") } ?? L("\(card.bankName) kartı", "\(card.bankName) card"))
         }
         .sheet(isPresented: $showBreakdown) {
             CategoryBreakdownSheet(
@@ -126,7 +126,7 @@ struct SummaryCardView: View {
                 }
                 .buttonStyle(.plain)
                 .layoutPriority(1)
-                .accessibilityHint("Dokunarak tutarları gizle ya da göster")
+                .accessibilityHint(L("Dokunarak tutarları gizle ya da göster", "Tap to hide or show amounts"))
 
                 budgetLimit(budget: budget, incomeDriven: incomeDriven)
                     .fixedSize()
@@ -146,7 +146,7 @@ struct SummaryCardView: View {
 
     private var monthStepper: some View {
         HStack(spacing: 6) {
-            stepButton("chevron.left", enabled: canGoBack, label: "Önceki ay") { shiftMonth(by: -1) }
+            stepButton("chevron.left", enabled: canGoBack, label: L("Önceki ay", "Previous month")) { shiftMonth(by: -1) }
 
             Button {
                 guard !isCurrentMonth else { return }
@@ -162,9 +162,9 @@ struct SummaryCardView: View {
                     .contentTransition(.interpolate)
             }
             .buttonStyle(.plain)
-            .accessibilityHint(isCurrentMonth ? "" : "Bu aya dönmek için dokun")
+            .accessibilityHint(isCurrentMonth ? "" : L("Bu aya dönmek için dokun", "Tap to return to this month"))
 
-            stepButton("chevron.right", enabled: canGoForward, label: "Sonraki ay") { shiftMonth(by: 1) }
+            stepButton("chevron.right", enabled: canGoForward, label: L("Sonraki ay", "Next month")) { shiftMonth(by: 1) }
         }
     }
 
@@ -200,10 +200,10 @@ struct SummaryCardView: View {
 
     private var filterLabel: String {
         switch filter {
-        case .all: return isFutureMonth ? "PLANLANAN" : "TÜM HARCAMALAR"
-        case .cash: return "NAKİT"
+        case .all: return isFutureMonth ? L("PLANLANAN", "SCHEDULED") : L("TÜM HARCAMALAR", "ALL SPENDING")
+        case .cash: return L("NAKİT", "CASH")
         case .card(let id):
-            return (store.card(id: id)?.pillTitle ?? "KART").uppercased(with: KurusDate.locale)
+            return (store.card(id: id)?.pillTitle ?? L("KART", "CARD")).uppercased(with: KurusDate.locale)
         }
     }
 
@@ -212,9 +212,9 @@ struct SummaryCardView: View {
     private var scopeTitle: String {
         let scope: String
         switch filter {
-        case .all: scope = "Tüm harcamalar"
-        case .cash: scope = "Nakit"
-        case .card(let id): scope = store.card(id: id)?.pillTitle ?? "Kart"
+        case .all: scope = L("Tüm harcamalar", "All spending")
+        case .cash: scope = L("Nakit", "Cash")
+        case .card(let id): scope = store.card(id: id)?.pillTitle ?? L("Kart", "Card")
         }
         return "\(KurusDate.monthYear(month)) · \(scope)"
     }
@@ -235,7 +235,7 @@ struct SummaryCardView: View {
                 Image(systemName: "chart.pie.fill")
                     .font(.system(size: 9, weight: .bold))
                 if filter == .all {
-                    Text("%\(Int((usage * 100).rounded()))")
+                    Text(Percent.string(usage))
                         .font(.system(size: 12, weight: .bold))
                         .monospacedDigit()
                         .contentTransition(.numericText(value: usage))
@@ -249,7 +249,7 @@ struct SummaryCardView: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Kategori analizi")
+        .accessibilityLabel(L("Kategori analizi", "Category breakdown"))
     }
 
     // MARK: - Bütçe limiti / gelir havuzu
@@ -267,10 +267,10 @@ struct SummaryCardView: View {
                 prefix: "/ "
             )
             .privacyBlur()
-            .accessibilityLabel("Bu ayın geliri \(CurrencyFormat.string(budget, fraction: false))")
+            .accessibilityLabel(L("Bu ayın geliri", "This month’s income") + " " + CurrencyFormat.string(budget, fraction: false))
         } else if isEditingBudget {
             HStack(spacing: 4) {
-                Text("/ ₺")
+                Text("/ \(CurrencyFormat.style().symbol)")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Theme.textSecondary)
                 TextField("30000", text: $budgetDraft)
@@ -290,7 +290,7 @@ struct SummaryCardView: View {
                         .foregroundStyle(Theme.emerald)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Bütçeyi kaydet")
+                .accessibilityLabel(L("Bütçeyi kaydet", "Save budget"))
             }
             .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .leading)))
         } else {
@@ -311,7 +311,7 @@ struct SummaryCardView: View {
                 .privacyBlur()
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Aylık bütçe limiti, düzenlemek için dokun")
+            .accessibilityLabel(L("Aylık bütçe limiti, düzenlemek için dokun", "Monthly budget, tap to edit"))
         }
     }
 
@@ -330,7 +330,7 @@ struct SummaryCardView: View {
 
     private func budgetCaption(spend: Decimal, allSpend: Decimal, budget: Decimal, incomeDriven: Bool) -> some View {
         let remaining = budget - spend
-        let pool = incomeDriven ? "Gelirden " : ""
+        let fmt: (Decimal) -> String = { CurrencyFormat.string($0, fraction: false) }
 
         return Group {
             if filter != .all {
@@ -338,32 +338,38 @@ struct SummaryCardView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "line.3.horizontal.decrease.circle.fill")
                         .foregroundStyle(Theme.ocean)
-                    Text("Bu ayki harcamanın %\(Int((share * 100).rounded()))’i bu havuzda")
+                    Text(L("Bu ayki harcamanın \(Percent.string(share))’i bu havuzda", "\(Percent.string(share)) of this month’s spending"))
                 }
             } else if isFutureMonth {
                 HStack(spacing: 6) {
                     Image(systemName: "calendar.badge.clock")
                         .foregroundStyle(Theme.ocean)
-                    Text("Taksit ve aboneliklerden tahmini yük")
+                    Text(L("Taksit ve aboneliklerden tahmini yük", "Projected from installments & subscriptions"))
                 }
             } else if remaining < 0 {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(Theme.coral)
-                    Text("\(incomeDriven ? "Gelir" : "Bütçe") \(CurrencyFormat.string(-remaining, fraction: false)) aşıldı")
+                    Text(incomeDriven
+                        ? L("Gelir \(fmt(-remaining)) aşıldı", "\(fmt(-remaining)) over income")
+                        : L("Bütçe \(fmt(-remaining)) aşıldı", "\(fmt(-remaining)) over budget"))
                         .foregroundStyle(Theme.coral)
                 }
             } else if isCurrentMonth {
                 HStack(spacing: 6) {
                     Image(systemName: incomeDriven ? "arrow.down.left.circle.fill" : "gauge.with.dots.needle.33percent")
                         .foregroundStyle(Theme.emerald)
-                    Text("\(pool)\(CurrencyFormat.string(remaining, fraction: false)) kaldı · günde \(CurrencyFormat.string(dailyAllowance(remaining), fraction: false))")
+                    Text(incomeDriven
+                        ? L("Gelirden \(fmt(remaining)) kaldı · günde \(fmt(dailyAllowance(remaining)))", "\(fmt(remaining)) of income left · \(fmt(dailyAllowance(remaining)))/day")
+                        : L("\(fmt(remaining)) kaldı · günde \(fmt(dailyAllowance(remaining)))", "\(fmt(remaining)) left · \(fmt(dailyAllowance(remaining)))/day"))
                 }
             } else {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(Theme.emerald)
-                    Text("Ay kapandı · \(pool.lowercased(with: KurusDate.locale))\(CurrencyFormat.string(remaining, fraction: false)) arttı")
+                    Text(incomeDriven
+                        ? L("Ay kapandı · gelirden \(fmt(remaining)) arttı", "Month closed · \(fmt(remaining)) of income saved")
+                        : L("Ay kapandı · \(fmt(remaining)) arttı", "Month closed · \(fmt(remaining)) under budget"))
                 }
             }
         }
@@ -407,9 +413,9 @@ struct SummaryCardView: View {
             .animation(Theme.spring, value: spendShare)
 
             HStack {
-                legend(color: Theme.ocean, title: "Gerçek Harcama", share: total > 0 ? spendShare : 0)
+                legend(color: Theme.ocean, title: L("Gerçek Harcama", "Spending"), share: total > 0 ? spendShare : 0)
                 Spacer(minLength: 8)
-                legend(color: Theme.violet, title: "Birikim / Yatırım", share: savedShare)
+                legend(color: Theme.violet, title: L("Birikim / Yatırım", "Savings / Investing"), share: savedShare)
             }
         }
     }
@@ -419,7 +425,7 @@ struct SummaryCardView: View {
             Circle().fill(color).frame(width: 7, height: 7)
             Text(title)
                 .foregroundStyle(Theme.textSecondary)
-            Text("%\(Int((share * 100).rounded()))")
+            Text(Percent.string(share))
                 .foregroundStyle(Theme.textPrimary)
                 .monospacedDigit()
                 .contentTransition(.numericText(value: share))
@@ -434,8 +440,8 @@ struct SummaryCardView: View {
     private var cardPills: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                pill(title: "Tümü", symbol: "square.stack.fill", value: .all)
-                pill(title: "Nakit", symbol: "banknote.fill", value: .cash)
+                pill(title: L("Tümü", "All"), symbol: "square.stack.fill", value: .all)
+                pill(title: L("Nakit", "Cash"), symbol: "banknote.fill", value: .cash)
                 ForEach(store.cards) { card in
                     pill(title: card.pillTitle, symbol: "creditcard.fill", value: .card(card.id))
                         .contextMenu { cardMenu(card) }
@@ -476,11 +482,11 @@ struct SummaryCardView: View {
             renameDraft = card.displayName
             renamingCard = card
         } label: {
-            Label("Kart Adını Değiştir", systemImage: "pencil")
+            Label(L("Kart Adını Değiştir", "Rename Card"), systemImage: "pencil")
         }
 
         Menu {
-            Picker("Hesap Kesim Günü", selection: Binding(
+            Picker(L("Hesap Kesim Günü", "Statement Day"), selection: Binding(
                 get: { card.statementDay ?? 0 },
                 set: { newValue in
                     withAnimation(Theme.spring) {
@@ -489,14 +495,14 @@ struct SummaryCardView: View {
                     Haptics.success()
                 }
             )) {
-                Text("Belirtilmedi").tag(0)
+                Text(L("Belirtilmedi", "Not set")).tag(0)
                 ForEach(1...31, id: \.self) { day in
-                    Text("Her ayın \(day). günü").tag(day)
+                    Text(L("Her ayın \(day). günü", "Day \(day) of each month")).tag(day)
                 }
             }
         } label: {
             Label(
-                card.statementDay.map { "Hesap Kesim Günü · \($0)" } ?? "Hesap Kesim Günü Seç",
+                card.statementDay.map { L("Hesap Kesim Günü · \($0)", "Statement Day · \($0)") } ?? L("Hesap Kesim Günü Seç", "Set Statement Day"),
                 systemImage: "calendar"
             )
         }
@@ -513,10 +519,10 @@ struct SummaryCardView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 6) {
                     Image(systemName: "calendar.badge.clock")
-                    Text("Yaklaşan Ödemeler")
+                    Text(L("Yaklaşan Ödemeler", "Upcoming"))
                     Spacer(minLength: 8)
                     if nextMonth > 0, let date = Ledger.calendar.date(byAdding: .month, value: 1, to: .now) {
-                        Text("\(KurusDate.monthName(date)) yükü \(CurrencyFormat.string(nextMonth, fraction: false))")
+                        Text(L("\(KurusDate.monthName(date)) yükü \(CurrencyFormat.string(nextMonth, fraction: false))", "\(KurusDate.monthName(date)): \(CurrencyFormat.string(nextMonth, fraction: false))"))
                             .monospacedDigit()
                             .foregroundStyle(Theme.amber)
                             .privacyBlur()

@@ -1,6 +1,6 @@
 //
 //  Theme.swift
-//  Kuruş — Zanaatkar Fintech tasarım sistemi
+//  Kuruş / Cent — Zanaatkar Fintech tasarım sistemi
 //
 //  Hedefler: App + Widget Extension
 //
@@ -112,7 +112,8 @@ extension View {
 
 // MARK: - Tutar tipografisi
 
-/// `₺12.000,50` — ana tutar tam boy, kuruş haneleri küçük ve %50 opak.
+/// Yerel tutar: ana kısım tam boy, kuruş/cent haneleri küçük ve %50 opak.
+/// tr: `₺12.000,50` · en_US: `$12,000.50` · de_DE: `12.000,50 €` (sembol sonda).
 /// Tüm rakamlar `.monospacedDigit()`; değişimler `.numericText()` ile akar.
 struct AmountText: View {
     let amount: Decimal
@@ -121,29 +122,38 @@ struct AmountText: View {
     var color: Color = Theme.textPrimary
     var showsFraction: Bool = true
     var prefix: String = ""
+    /// ISO para birimi; `nil` → cihazın ana para birimi.
+    var currency: String? = nil
 
     var body: some View {
-        let parts = CurrencyFormat.parts(showsFraction ? amount : amount.rounded(0))
-        let main = Text(verbatim: "\(prefix)\(parts.sign)₺\(parts.integer)")
-            .font(.system(size: size, weight: weight))
+        let parts = CurrencyFormat.parts(showsFraction ? amount : amount.rounded(0), currency: currency)
+        let style = parts.style
+        let leading = style.symbolFirst ? style.symbol + style.spacing : ""
+        let trailing = style.symbolFirst ? "" : style.spacing + style.symbol
+        let mainFont = Font.system(size: size, weight: weight)
+
+        let main = Text(verbatim: "\(prefix)\(parts.sign)\(leading)\(parts.integer)")
+            .font(mainFont)
             .monospacedDigit()
-        let fraction = Text(verbatim: ",\(parts.fraction)")
+        let fraction = Text(verbatim: "\(style.decimal)\(parts.fraction)")
             .font(.system(size: size * 0.56, weight: weight))
             .monospacedDigit()
             .foregroundStyle(color.opacity(0.5))
+        let suffix = Text(verbatim: trailing)
+            .font(mainFont)
 
         Group {
             if showsFraction {
-                Text("\(main)\(fraction)")
+                Text("\(main)\(fraction)\(suffix)")
             } else {
-                main
+                Text("\(main)\(suffix)")
             }
         }
         .foregroundStyle(color)
         .lineLimit(1)
         .minimumScaleFactor(0.75)
         .contentTransition(.numericText(value: amount.doubleValue))
-        .accessibilityLabel(Text(verbatim: CurrencyFormat.string(amount, fraction: showsFraction)))
+        .accessibilityLabel(Text(verbatim: CurrencyFormat.string(amount, fraction: showsFraction, currency: currency)))
     }
 }
 

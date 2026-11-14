@@ -1,6 +1,6 @@
 //
 //  SharedExpenseStore.swift
-//  Kuruş — Yerel depolama (App Group) + iCloud anahtar-değer eşitlemesi
+//  Kuruş / Cent — Yerel depolama (App Group) + iCloud anahtar-değer eşitlemesi
 //
 //  Hedefler: App + Widget Extension
 //
@@ -64,6 +64,10 @@ final class SharedExpenseStore {
     @discardableResult
     func add(_ parsed: ParsedExpense, at date: Date = .now, isDemo: Bool = false) -> [Expense] {
         guard let total = parsed.amount, total > 0 else { return [] }
+        // "dün" / "yesterday" → bir gün önce
+        let date = parsed.dayOffset == 0
+            ? date
+            : (Ledger.calendar.date(byAdding: .day, value: parsed.dayOffset, to: date) ?? date)
         var created: [Expense] = []
         commit { s in
             if !isDemo {
@@ -213,7 +217,8 @@ final class SharedExpenseStore {
                 installment: count > 1 ? InstallmentInfo(groupID: group, index: i + 1, count: count, total: total) : nil,
                 isRecurring: parsed.isRecurring,
                 isDemo: isDemo,
-                note: parsed.rawText
+                note: parsed.rawText,
+                currencyCode: parsed.currencyCode
             )
         }
     }

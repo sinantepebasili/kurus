@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  Kuruş — Ana ekran: soru sormayan canlı demo, özet, liste, sürtünmesiz düzenleme/silme
+//  Kuruş / Cent — Ana ekran: soru sormayan canlı demo, özet, liste, sürtünmesiz düzenleme/silme
 //
 //  Hedef: App
 //
@@ -103,7 +103,7 @@ struct ContentView: View {
                                 Button(role: .destructive) {
                                     delete(expense)
                                 } label: {
-                                    Label("Sil", systemImage: "trash.fill")
+                                    Label(L("Sil", "Delete"), systemImage: "trash.fill")
                                 }
                                 .tint(Theme.coral)
                             }
@@ -165,7 +165,7 @@ struct ContentView: View {
         HStack(alignment: .center, spacing: 10) {
             BrandHeaderView()
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Kuruş")
+                .accessibilityLabel(AppLanguage.brandName)
                 .accessibilityAddTraits(.isHeader)
 
             Spacer(minLength: 8)
@@ -179,13 +179,13 @@ struct ContentView: View {
                     .circleIcon()
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(isPrivate ? "Tutarları göster" : "Tutarları gizle")
+            .accessibilityLabel(isPrivate ? L("Tutarları göster", "Show amounts") : L("Tutarları gizle", "Hide amounts"))
 
             Menu {
                 Button {
                     showGuide = true
                 } label: {
-                    Label("Banka SMS Otomasyonu Rehberi", systemImage: "text.bubble")
+                    Label(L("Banka SMS Otomasyonu Rehberi", "Auto-Capture Guide (Apple Pay & SMS)"), systemImage: "text.bubble")
                 }
 
                 Divider()
@@ -199,11 +199,11 @@ struct ContentView: View {
                             Ledger.inMonth(store.expenses, of: selectedMonth),
                             manual: store.monthlyBudget
                         ),
-                        fileName: "\(ExportManager.fileStem(for: selectedMonth))-Ekstre.pdf"
+                        fileName: "\(ExportManager.fileStem(for: selectedMonth))-\(L("Ekstre", "Statement")).pdf"
                     ),
-                    preview: SharePreview("Kuruş Ekstresi", image: Image(systemName: "doc.richtext"))
+                    preview: SharePreview(L("\(AppLanguage.brandName) Ekstresi", "\(AppLanguage.brandName) Statement"), image: Image(systemName: "doc.richtext"))
                 ) {
-                    Label("Ekstre Oluştur (PDF)", systemImage: "doc.richtext")
+                    Label(L("Ekstre Oluştur (PDF)", "Create Statement (PDF)"), systemImage: "doc.richtext")
                 }
 
                 ShareLink(
@@ -212,16 +212,16 @@ struct ContentView: View {
                         cards: store.cards,
                         fileName: "\(ExportManager.fileStem()).csv"
                     ),
-                    preview: SharePreview("Kuruş Harcamaları", image: Image(systemName: "tablecells"))
+                    preview: SharePreview(L("\(AppLanguage.brandName) Harcamaları", "\(AppLanguage.brandName) Expenses"), image: Image(systemName: "tablecells"))
                 ) {
-                    Label("Excel / CSV Paylaş", systemImage: "tablecells")
+                    Label(L("Excel / CSV Paylaş", "Share Excel / CSV"), systemImage: "tablecells")
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .circleIcon()
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Menü")
+            .accessibilityLabel(L("Menü", "Menu"))
         }
     }
 
@@ -236,10 +236,10 @@ struct ContentView: View {
                     .frame(width: 34, height: 34)
                     .background(Theme.amber.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Kuruş böyle çalışır")
+                    Text(L("\(AppLanguage.brandName) böyle çalışır", "This is how \(AppLanguage.brandName) works"))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Theme.textPrimary)
-                    Text("Yaz ve Return’e bas. Marka, kart ve taksit kendiliğinden anlaşılır.")
+                    Text(L("Yaz ve Return’e bas. Marka, kart ve taksit kendiliğinden anlaşılır.", "Type and hit Return. Brand, card and installments are understood automatically."))
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -249,7 +249,7 @@ struct ContentView: View {
             Button(action: clearAndStart) {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles")
-                    Text("Temizle ve Başla")
+                    Text(L("Temizle ve Başla", "Clear & Start"))
                 }
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.background)
@@ -284,15 +284,17 @@ struct ContentView: View {
 
     private var emptyTitle: String {
         let name = KurusDate.monthName(selectedMonth)
-        if Ledger.isFutureMonth(selectedMonth) { return "\(name) için planlı ödeme yok" }
-        if !Ledger.isCurrentMonth(selectedMonth) { return "\(name) ayında kayıt yok" }
-        return filter == .all ? "Bu ay henüz harcama yok" : "Bu havuzda bu ay harcama yok"
+        if Ledger.isFutureMonth(selectedMonth) { return L("\(name) için planlı ödeme yok", "No scheduled payments for \(name)") }
+        if !Ledger.isCurrentMonth(selectedMonth) { return L("\(name) ayında kayıt yok", "Nothing logged in \(name)") }
+        return filter == .all
+            ? L("Bu ay henüz harcama yok", "No expenses this month yet")
+            : L("Bu havuzda bu ay harcama yok", "Nothing on this card this month")
     }
 
     private var emptySubtitle: String {
-        if Ledger.isFutureMonth(selectedMonth) { return "Taksitler ve abonelikler burada kendiliğinden belirir." }
-        if !Ledger.isCurrentMonth(selectedMonth) { return "Bugüne dönmek için ay başlığına dokun." }
-        return "Aşağıya “Kahve 145” ya da “+Maaş 65000” yazıp Return’e bas."
+        if Ledger.isFutureMonth(selectedMonth) { return L("Taksitler ve abonelikler burada kendiliğinden belirir.", "Installments and subscriptions appear here automatically.") }
+        if !Ledger.isCurrentMonth(selectedMonth) { return L("Bugüne dönmek için ay başlığına dokun.", "Tap the month title to jump back to today.") }
+        return L("Aşağıya “Kahve 145” ya da “+Maaş 65000” yazıp Return’e bas.", "Type “Coffee 5” or “+Salary 5000” below and hit Return.")
     }
 
     private func dayHeader(_ group: DayGroup) -> some View {
@@ -398,7 +400,8 @@ struct ContentView: View {
             withAnimation(Theme.spring) { isDemoTyping = true }
             try? await Task.sleep(for: .milliseconds(800))
 
-            for phrase in ["Netflix 229", "Turkcell 450"] {
+            // Dile göre: "Kahve 145", "Migros 640", "Altın 4500" / "Coffee 5", "Whole Foods 85", "S&P 500 500"
+            for phrase in QuickSamples.all.map(\.command) {
                 for character in phrase {
                     guard !Task.isCancelled else { return }
                     inputText.append(character)
@@ -466,7 +469,7 @@ struct ExpenseRowView: View {
                     }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Kategori: \(expense.category.title). Değiştirmek için dokun")
+            .accessibilityLabel(L("Kategori: \(expense.category.title). Değiştirmek için dokun", "Category: \(expense.category.title). Tap to change"))
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
@@ -486,7 +489,7 @@ struct ExpenseRowView: View {
                             .fixedSize()
                     }
                     if isProjected {
-                        Text("Tahmini")
+                        Text(L("Tahmini", "Projected"))
                             .font(.system(size: 10.5, weight: .semibold))
                             .foregroundStyle(Theme.ocean)
                             .padding(.horizontal, 6)
@@ -495,7 +498,7 @@ struct ExpenseRowView: View {
                             .fixedSize()
                     }
                     if expense.isDemo {
-                        Text("Örnek")
+                        Text(L("Örnek", "Sample"))
                             .font(.system(size: 10.5, weight: .semibold))
                             .foregroundStyle(Theme.textSecondary)
                             .padding(.horizontal, 6)
@@ -521,10 +524,11 @@ struct ExpenseRowView: View {
                     size: 16,
                     weight: .semibold,
                     color: amountColor,
-                    prefix: expense.category.isIncome ? "+" : ""
+                    prefix: expense.category.isIncome ? "+" : "",
+                    currency: expense.currencyCode
                 )
                 if let installment = expense.installment {
-                    Text("toplam \(CurrencyFormat.string(installment.total, fraction: false))")
+                    Text(L("toplam", "total") + " " + CurrencyFormat.string(installment.total, fraction: false, currency: expense.currencyCode))
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Theme.textMuted)
                         .monospacedDigit()
@@ -556,7 +560,7 @@ struct ExpenseRowView: View {
         if let card {
             parts.append(card.pillTitle)
         } else if !expense.category.isIncome {
-            parts.append("Nakit")
+            parts.append(L("Nakit", "Cash"))
         }
         // Tahmini kayıtlarda saat anlamsız; gün gösterilir.
         parts.append(isProjected ? KurusDate.shortDay(expense.date) : KurusDate.time(expense.date))
@@ -581,7 +585,7 @@ struct CategoryPickerSheet: View {
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
-                    Text("Kategori seç")
+                    Text(L("Kategori seç", "Choose a category"))
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.textSecondary)
                 }
@@ -645,7 +649,7 @@ struct UndoToast: View {
             Image(systemName: "trash.fill")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.coral)
-            Text("Silindi")
+            Text(L("Silindi", "Deleted"))
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.textPrimary)
             Text("— \(state.title)")
@@ -655,7 +659,7 @@ struct UndoToast: View {
                 .minimumScaleFactor(0.75)
             Spacer(minLength: 8)
             Button(action: onUndo) {
-                Text("Geri Al")
+                Text(L("Geri Al", "Undo"))
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Theme.emerald)
                     .padding(.horizontal, 6)

@@ -15,6 +15,18 @@
 			isa = PBXBuildFile;
 			fileRef = AE91E4A2F27199611E1133D6;
 		};
+		214944470C3BF56F3B86821F /* Localizable.xcstrings in Resources */ = {
+			isa = PBXBuildFile;
+			fileRef = A53046FE1844806311F2D784;
+		};
+		359E21854C1437F63AD12954 /* Localizable.xcstrings in Resources */ = {
+			isa = PBXBuildFile;
+			fileRef = A53046FE1844806311F2D784;
+		};
+		3E2D00AEE8B7781E7E437263 /* Localization.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = EF3D5C4E195956B127EFE63D;
+		};
 		467AE9AF2E2C4CDD1F97EFD9 /* SharedExpenseStore.swift in Sources */ = {
 			isa = PBXBuildFile;
 			fileRef = C9B8987A2B165A6E3E189020;
@@ -31,6 +43,10 @@
 			isa = PBXBuildFile;
 			fileRef = 23DA6D7374CE0CA94A81109A;
 		};
+		60CFF1C1184FEDA89F87D731 /* Localization.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = EF3D5C4E195956B127EFE63D;
+		};
 		62B6C47CA07AC8166B5432DD /* Assets.xcassets in Resources */ = {
 			isa = PBXBuildFile;
 			fileRef = 18297A60B9E3FA7FC1BD99F1;
@@ -38,6 +54,10 @@
 		63EC8AB55282B3F1C898D7A1 /* BrandEngine.swift in Sources */ = {
 			isa = PBXBuildFile;
 			fileRef = 8630CC489063CBE3A06B0D78;
+		};
+		6E0B92A6A0AA124BFE8C7B7E /* InfoPlist.xcstrings in Resources */ = {
+			isa = PBXBuildFile;
+			fileRef = 9B78A06CDB044A248C0F0C6B;
 		};
 		75C1421399AE6983410BEA7A /* KurusWidget.swift in Sources */ = {
 			isa = PBXBuildFile;
@@ -58,6 +78,10 @@
 		83FC11542C10D7CEEFEB458F /* ExpenseParser.swift in Sources */ = {
 			isa = PBXBuildFile;
 			fileRef = 94F5BDE443E50ABAF5C1ACAE;
+		};
+		85875B2C30D3F0CAEC802D1A /* AppShortcuts.xcstrings in Resources */ = {
+			isa = PBXBuildFile;
+			fileRef = 7F8C3E1B91FDA363AAA67C27;
 		};
 		8FA8BD6179AA39149CFDF039 /* Theme.swift in Sources */ = {
 			isa = PBXBuildFile;
@@ -103,6 +127,10 @@
 					RemoveHeadersOnCopy,
 				);
 			};
+		};
+		C9E508A6365EBE8C22B18762 /* InfoPlist.xcstrings in Resources */ = {
+			isa = PBXBuildFile;
+			fileRef = 53D7135E4646663BBC2E10DE;
 		};
 		D0B3D92509751094E64CAA59 /* AutomationGuideSheet.swift in Sources */ = {
 			isa = PBXBuildFile;
@@ -200,6 +228,12 @@
 			path = ContentView.swift;
 			sourceTree = "<group>";
 		};
+		53D7135E4646663BBC2E10DE /* InfoPlist.xcstrings */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.json.xcstrings;
+			path = InfoPlist.xcstrings;
+			sourceTree = "<group>";
+		};
 		597256962D1320E988664EA7 /* ExpenseModel.swift */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
@@ -231,6 +265,12 @@
 			path = KurusWidget.swift;
 			sourceTree = "<group>";
 		};
+		7F8C3E1B91FDA363AAA67C27 /* AppShortcuts.xcstrings */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.json.xcstrings;
+			path = AppShortcuts.xcstrings;
+			sourceTree = "<group>";
+		};
 		8509DD790DE7D4A444D69168 /* README.md */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = net.daringfireball.markdown;
@@ -256,10 +296,22 @@
 			path = Kurus.app;
 			sourceTree = BUILT_PRODUCTS_DIR;
 		};
+		9B78A06CDB044A248C0F0C6B /* InfoPlist.xcstrings */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.json.xcstrings;
+			path = InfoPlist.xcstrings;
+			sourceTree = "<group>";
+		};
 		A4230DB0AAFFA6A5F968B465 /* ExportManager.swift */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
 			path = ExportManager.swift;
+			sourceTree = "<group>";
+		};
+		A53046FE1844806311F2D784 /* Localizable.xcstrings */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.json.xcstrings;
+			path = Localizable.xcstrings;
 			sourceTree = "<group>";
 		};
 		AE91E4A2F27199611E1133D6 /* CategoryBreakdownSheet.swift */ = {
@@ -323,6 +375,12 @@
 			path = Info.plist;
 			sourceTree = "<group>";
 		};
+		EF3D5C4E195956B127EFE63D /* Localization.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = Localization.swift;
+			sourceTree = "<group>";
+		};
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -350,6 +408,7 @@
 			children = (
 				7E6CE1B944E8EBFC627A1136,
 				18297A60B9E3FA7FC1BD99F1,
+				9B78A06CDB044A248C0F0C6B,
 				23DA6D7374CE0CA94A81109A,
 				EF20FA111E12B64F0B253C89,
 				B644D499B755ABAD8014E968,
@@ -381,12 +440,14 @@
 		B46A6AFB1DC88CE23F6E63F1 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				EF3D5C4E195956B127EFE63D,
 				4EC1FF35F8179A094C3AB745,
 				8630CC489063CBE3A06B0D78,
 				597256962D1320E988664EA7,
 				94F5BDE443E50ABAF5C1ACAE,
 				C9B8987A2B165A6E3E189020,
 				20A3187FAD18F8635D483E67,
+				A53046FE1844806311F2D784,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -412,6 +473,8 @@
 				BDB0FD55639C02365AEDFBBC,
 				AE91E4A2F27199611E1133D6,
 				D59B301BE12A39FF7C501E5C,
+				53D7135E4646663BBC2E10DE,
+				7F8C3E1B91FDA363AAA67C27,
 				0365672E26E54D87A9D1F001,
 				E13C64A991407F941ECFA54F,
 				70C3E1E6812D90445F07DE86,
@@ -478,11 +541,11 @@
 			};
 			buildConfigurationList = 7EF2517A8FE63F4681EC5EEA;
 			compatibilityVersion = "Xcode 14.0";
-			developmentRegion = tr;
+			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
-				tr,
 				en,
+				tr,
 				Base,
 			);
 			mainGroup = 518DA81DB9B99529C0C0AEBE;
@@ -502,6 +565,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				A73DAF1F7CDEE0C0D00BF3DF,
+				C9E508A6365EBE8C22B18762,
+				85875B2C30D3F0CAEC802D1A,
+				214944470C3BF56F3B86821F,
 				A7888F0FF1FC09A98765B3FD,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -511,6 +577,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				62B6C47CA07AC8166B5432DD,
+				6E0B92A6A0AA124BFE8C7B7E,
+				359E21854C1437F63AD12954,
 				55D76C63BE62CE476F86B274,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -523,6 +591,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				75C1421399AE6983410BEA7A,
+				60CFF1C1184FEDA89F87D731,
 				933B8369F8FB07C539D8173A,
 				63EC8AB55282B3F1C898D7A1,
 				F66173476F021599F1425643,
@@ -544,6 +613,7 @@
 				96E5C6DACAFC3CC9761EA9F3,
 				9FD66F03F7BD3D04981026B3,
 				0DF714FA2CFF3303A8CF7BCE,
+				3E2D00AEE8B7781E7E437263,
 				8FA8BD6179AA39149CFDF039,
 				02B4B43DE33C307CD5FFD54B,
 				E6CE0D9B539340CED45C9F6A,
@@ -605,7 +675,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Kuruş";
+				INFOPLIST_KEY_CFBundleDisplayName = Cent;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = public.app-category.finance;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -677,7 +747,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Kuruş";
+				INFOPLIST_KEY_CFBundleDisplayName = Cent;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = public.app-category.finance;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -712,7 +782,7 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Widget/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Kuruş";
+				INFOPLIST_KEY_CFBundleDisplayName = Cent;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -742,7 +812,7 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Widget/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Kuruş";
+				INFOPLIST_KEY_CFBundleDisplayName = Cent;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

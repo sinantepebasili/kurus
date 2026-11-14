@@ -1,6 +1,6 @@
 //
 //  ExpenseModel.swift
-//  Kuruş — Veri modeli, hesap defteri (Ledger) ve biçimlendirme
+//  Kuruş / Cent — Veri modeli, hesap defteri (Ledger) ve biçimlendirme
 //
 //  Hedefler: App + Widget Extension
 //
@@ -18,21 +18,21 @@ enum ExpenseCategory: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .food: "Yemek"
-        case .coffee: "Kahve"
-        case .market: "Market"
-        case .transport: "Ulaşım"
-        case .shopping: "Alışveriş"
-        case .technology: "Teknoloji"
-        case .bills: "Fatura"
-        case .subscription: "Abonelik"
-        case .entertainment: "Eğlence"
-        case .health: "Sağlık"
-        case .travel: "Seyahat"
-        case .education: "Eğitim"
-        case .savings: "Birikim"
-        case .income: "Gelir"
-        case .other: "Diğer"
+        case .food: L("Yemek", "Food")
+        case .coffee: L("Kahve", "Coffee")
+        case .market: L("Market", "Groceries")
+        case .transport: L("Ulaşım", "Transport")
+        case .shopping: L("Alışveriş", "Shopping")
+        case .technology: L("Teknoloji", "Tech")
+        case .bills: L("Fatura", "Bills")
+        case .subscription: L("Abonelik", "Subscriptions")
+        case .entertainment: L("Eğlence", "Entertainment")
+        case .health: L("Sağlık", "Health")
+        case .travel: L("Seyahat", "Travel")
+        case .education: L("Eğitim", "Education")
+        case .savings: L("Birikim", "Savings")
+        case .income: L("Gelir", "Income")
+        case .other: L("Diğer", "Other")
         }
     }
 
@@ -127,6 +127,9 @@ struct Expense: Codable, Identifiable, Hashable, Sendable {
     var isRecurring: Bool
     var isDemo: Bool
     var note: String?
+    /// ISO para birimi. `nil` → cihazın ana para birimi (`Money.homeCurrency`).
+    /// Yabancı para birimli kayıtlar (ör. yurt dışında "$14.50") kur çevrimi yapılmadığı için toplamlara girmez.
+    var currencyCode: String?
 
     init(
         id: UUID = UUID(),
@@ -139,7 +142,8 @@ struct Expense: Codable, Identifiable, Hashable, Sendable {
         installment: InstallmentInfo? = nil,
         isRecurring: Bool = false,
         isDemo: Bool = false,
-        note: String? = nil
+        note: String? = nil,
+        currencyCode: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -152,9 +156,13 @@ struct Expense: Codable, Identifiable, Hashable, Sendable {
         self.isRecurring = isRecurring
         self.isDemo = isDemo
         self.note = note
+        self.currencyCode = currencyCode
     }
 
     var brand: Brand? { brandID.flatMap(BrandEngine.brand(id:)) }
+
+    /// Ana para biriminde mi (toplamlara dahil mi)?
+    var isHomeCurrency: Bool { currencyCode == nil || currencyCode == Money.homeCurrency }
 }
 
 // MARK: - Kalıcı anlık görüntü (App Group + iCloud KVS)
@@ -210,8 +218,8 @@ struct DayTotal: Hashable, Sendable {
 enum Ledger {
     static var calendar: Calendar {
         var cal = Calendar(identifier: .gregorian)
-        cal.locale = Locale(identifier: "tr_TR")
-        cal.firstWeekday = 2
+        cal.locale = .current
+        cal.firstWeekday = Calendar.current.firstWeekday
         cal.timeZone = .current
         return cal
     }
@@ -221,8 +229,9 @@ enum Ledger {
         return expenses.filter { cal.isDate($0.date, equalTo: date, toGranularity: .month) }
     }
 
+    /// Yalnızca ana para birimindeki kayıtları toplar; döviz kayıtları kur çevrimi olmadan toplanamaz.
     static func sum(_ expenses: [Expense]) -> Decimal {
-        expenses.reduce(Decimal(0)) { $0 + $1.amount }
+        expenses.reduce(Decimal(0)) { $1.isHomeCurrency ? $0 + $1.amount : $0 }
     }
 
     static func spending(_ expenses: [Expense]) -> Decimal {
@@ -292,7 +301,8 @@ enum Ledger {
                 cardID: source.cardID,
                 isRecurring: true,
                 isDemo: source.isDemo,
-                note: source.note
+                note: source.note,
+                currencyCode: source.currencyCode
             )
         }
     }
@@ -368,7 +378,7 @@ enum Ledger {
             items.append(UpcomingPayment(
                 id: "inst-\(e.id.uuidString)",
                 title: e.title,
-                subtitle: "Taksit \(e.installment?.label ?? "")",
+                subtitle: "\(L("Taksit", "Installment")) \(e.installment?.label ?? "")",
                 date: e.date,
                 amount: e.amount,
                 brandID: e.brandID,
@@ -383,7 +393,7 @@ enum Ledger {
             items.append(UpcomingPayment(
                 id: "sub-\(e.id.uuidString)",
                 title: e.title,
-                subtitle: "Yenileme",
+                subtitle: L("Yenileme", "Renews"),
                 date: next,
                 amount: e.amount,
                 brandID: e.brandID,
@@ -401,7 +411,7 @@ enum Ledger {
             items.append(UpcomingPayment(
                 id: "stmt-\(card.id)",
                 title: card.pillTitle,
-                subtitle: "Hesap kesimi",
+                subtitle: L("Hesap kesimi", "Statement"),
                 date: next,
                 amount: due > 0 ? due : nil,
                 brandID: nil,
@@ -425,41 +435,7 @@ enum Ledger {
     }
 }
 
-// MARK: - Para biçimi (tr_TR: ₺12.000,50)
-
-enum CurrencyFormat {
-    static func parts(_ value: Decimal) -> (sign: String, integer: String, fraction: String) {
-        let rounded = value.rounded(2)
-        let negative = rounded < 0
-        let absolute = negative ? -rounded : rounded
-        let cents = NSDecimalNumber(decimal: absolute * 100).int64Value
-        let integer = cents / 100
-        let fraction = cents % 100
-        return (negative ? "−" : "", grouped(integer), String(format: "%02lld", fraction))
-    }
-
-    static func grouped(_ value: Int64) -> String {
-        let digits = String(value)
-        var out = ""
-        for (index, char) in digits.enumerated() {
-            if index > 0, (digits.count - index) % 3 == 0 { out.append(".") }
-            out.append(char)
-        }
-        return out
-    }
-
-    /// "₺12.000,50" ya da `fraction: false` ile "₺12.001"
-    static func string(_ value: Decimal, fraction: Bool = true) -> String {
-        let p = parts(fraction ? value : value.rounded(0))
-        return "\(p.sign)₺\(p.integer)" + (fraction ? ",\(p.fraction)" : "")
-    }
-
-    /// CSV için gruplamasız "642,50"
-    static func plain(_ value: Decimal) -> String {
-        let p = parts(value)
-        return "\(p.sign == "" ? "" : "-")\(p.integer.replacingOccurrences(of: ".", with: "")),\(p.fraction)"
-    }
-}
+// Para biçimi: bkz. Localization.swift (CurrencyFormat)
 
 extension Decimal {
     func rounded(_ scale: Int) -> Decimal {
@@ -472,10 +448,10 @@ extension Decimal {
     var doubleValue: Double { NSDecimalNumber(decimal: self).doubleValue }
 }
 
-// MARK: - Tarih biçimleri
+// MARK: - Tarih biçimleri (cihaz yerel ayarı)
 
 enum KurusDate {
-    static let locale = Locale(identifier: "tr_TR")
+    static var locale: Locale { .current }
 
     static func monthName(_ date: Date) -> String {
         date.formatted(.dateTime.month(.wide).locale(locale))
@@ -493,14 +469,15 @@ enum KurusDate {
         date.formatted(.dateTime.day(.twoDigits).month(.twoDigits).year().locale(locale))
     }
 
+    /// tr: "14:32" · en_US: "2:32 PM"
     static func time(_ date: Date) -> String {
-        date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits).locale(locale))
+        date.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(locale))
     }
 
     static func dayHeader(_ date: Date) -> String {
         let cal = Ledger.calendar
-        if cal.isDateInToday(date) { return "Bugün" }
-        if cal.isDateInYesterday(date) { return "Dün" }
+        if cal.isDateInToday(date) { return L("Bugün", "Today") }
+        if cal.isDateInYesterday(date) { return L("Dün", "Yesterday") }
         return date.formatted(.dateTime.day().month(.wide).weekday(.wide).locale(locale))
     }
 
@@ -508,16 +485,17 @@ enum KurusDate {
         let cal = Ledger.calendar
         let days = cal.dateComponents([.day], from: cal.startOfDay(for: now), to: cal.startOfDay(for: date)).day ?? 0
         switch days {
-        case ..<1: return "Bugün"
-        case 1: return "Yarın"
-        default: return "\(days) gün"
+        case ..<1: return L("Bugün", "Today")
+        case 1: return L("Yarın", "Tomorrow")
+        default: return L("\(days) gün", "in \(days) days")
         }
     }
 
-    /// Pazar=1 … Cumartesi=7 → Türkçe baş harf
+    /// Yerel tek harfli gün adı (tr: P S Ç P C C P · en: M T W T F S S)
     static func weekdayInitial(_ date: Date) -> String {
-        let initials = ["P", "P", "S", "Ç", "P", "C", "C"]
-        let weekday = Ledger.calendar.component(.weekday, from: date)
-        return initials[max(0, min(6, weekday - 1))]
+        let cal = Ledger.calendar
+        let symbols = cal.veryShortStandaloneWeekdaySymbols
+        let weekday = cal.component(.weekday, from: date)
+        return symbols[max(0, min(symbols.count - 1, weekday - 1))]
     }
 }

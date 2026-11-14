@@ -1,6 +1,6 @@
 //
 //  KurusWidget.swift
-//  Kuruş — Tek WidgetBundle altında 4 widget
+//  Kuruş / Cent — Tek WidgetBundle altında 4 widget
 //
 //  Hedef: Widget Extension
 //  (Ayrıca bu hedefe dahil edin: Theme, BrandEngine, ExpenseModel, ExpenseParser,
@@ -86,21 +86,6 @@ struct KurusProvider: TimelineProvider {
 
 // MARK: - 1) İnteraktif Hızlı Ekleme (.systemMedium)
 
-private struct QuickPreset: Identifiable {
-    let id: String
-    let title: String
-    let amount: Decimal
-    let category: ExpenseCategory
-
-    var command: String { "\(title) \(NSDecimalNumber(decimal: amount).stringValue)" }
-
-    static let all: [QuickPreset] = [
-        QuickPreset(id: "coffee", title: "Kahve", amount: 145, category: .coffee),
-        QuickPreset(id: "food", title: "Yemek", amount: 320, category: .food),
-        QuickPreset(id: "market", title: "Market", amount: 500, category: .market),
-    ]
-}
-
 struct QuickAddWidgetView: View {
     let entry: KurusEntry
 
@@ -108,7 +93,7 @@ struct QuickAddWidgetView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("BU AY")
+                    Text(L("BU AY", "THIS MONTH"))
                         .font(.system(size: 11, weight: .semibold))
                         .tracking(0.6)
                         .foregroundStyle(Theme.textSecondary)
@@ -119,7 +104,7 @@ struct QuickAddWidgetView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "plus")
                             .font(.system(size: 12, weight: .bold))
-                        Text("Yaz")
+                        Text(L("Yaz", "Log"))
                             .font(.system(size: 13, weight: .semibold))
                     }
                     .foregroundStyle(Theme.background)
@@ -132,7 +117,7 @@ struct QuickAddWidgetView: View {
             Spacer(minLength: 8)
 
             HStack(spacing: 8) {
-                ForEach(QuickPreset.all) { preset in
+                ForEach(QuickSamples.all) { preset in
                     Button(intent: AddExpenseIntent(text: preset.command)) {
                         presetChip(preset)
                     }
@@ -142,7 +127,7 @@ struct QuickAddWidgetView: View {
         }
     }
 
-    private func presetChip(_ preset: QuickPreset) -> some View {
+    private func presetChip(_ preset: QuickSample) -> some View {
         HStack(spacing: 8) {
             Image(systemName: preset.category.symbol)
                 .font(.system(size: 12, weight: .semibold))
@@ -174,8 +159,8 @@ struct QuickAddWidget: Widget {
             QuickAddWidgetView(entry: entry)
                 .containerBackground(for: .widget) { Theme.background }
         }
-        .configurationDisplayName("Hızlı Ekle")
-        .description("Aylık toplamın ve tek dokunuşla kahve, yemek, market kaydı.")
+        .configurationDisplayName("Quick Add")
+        .description("Your monthly total and one-tap logging.")
         .supportedFamilies([.systemMedium])
     }
 }
@@ -192,7 +177,7 @@ struct WeeklyPulseWidgetView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("7 GÜN")
+                Text(L("7 GÜN", "7 DAYS"))
                     .font(.system(size: 11, weight: .semibold))
                     .tracking(0.6)
                     .foregroundStyle(Theme.textSecondary)
@@ -223,7 +208,7 @@ struct WeeklyPulseWidgetView: View {
 
             Spacer(minLength: 6)
 
-            Text("Bugün")
+            Text(L("Bugün", "Today"))
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Theme.textSecondary)
             AmountText(amount: entry.todayTotal, size: 20, weight: .bold)
@@ -239,8 +224,8 @@ struct WeeklyPulseWidget: Widget {
             WeeklyPulseWidgetView(entry: entry)
                 .containerBackground(for: .widget) { Theme.background }
         }
-        .configurationDisplayName("7 Günlük İvme")
-        .description("Son yedi günün harcama ritmi ve bugünkü toplam.")
+        .configurationDisplayName("7-Day Pulse")
+        .description("Your spending rhythm over the last seven days.")
         .supportedFamilies([.systemSmall])
     }
 }
@@ -260,7 +245,10 @@ struct BudgetRingWidgetView: View {
         }
         .gaugeStyle(.accessoryCircularCapacity)
         .widgetAccentable()
-        .accessibilityLabel("Bütçenin yüzde \(Int((entry.budgetProgress * 100).rounded())) kısmı kullanıldı")
+        .accessibilityLabel(L(
+            "Bütçenin yüzde \(Int((entry.budgetProgress * 100).rounded())) kısmı kullanıldı",
+            "\(Int((entry.budgetProgress * 100).rounded()))% of budget used"
+        ))
     }
 }
 
@@ -272,8 +260,8 @@ struct BudgetRingWidget: Widget {
             BudgetRingWidgetView(entry: entry)
                 .containerBackground(for: .widget) { Color.clear }
         }
-        .configurationDisplayName("Bütçe Halkası")
-        .description("Aylık limitine göre dolan halka.")
+        .configurationDisplayName("Budget Ring")
+        .description("A ring that fills against your monthly limit.")
         .supportedFamilies([.accessoryCircular])
     }
 }
@@ -287,7 +275,7 @@ struct MonthlyLineWidgetView: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
                 Image(systemName: "turkishlirasign.circle.fill")
-                Text("Kuruş · \(KurusDate.monthName(entry.date))")
+                Text("\(AppLanguage.brandName) · \(KurusDate.monthName(entry.date))")
             }
             .font(.system(size: 12, weight: .semibold))
             .widgetAccentable()
@@ -299,7 +287,7 @@ struct MonthlyLineWidgetView: View {
                 .minimumScaleFactor(0.75)
 
             HStack(spacing: 6) {
-                Text("Birikim %\(Int((entry.savingsShare * 100).rounded()))")
+                Text(L("Birikim %\(Int((entry.savingsShare * 100).rounded()))", "Saved \(Int((entry.savingsShare * 100).rounded()))%"))
                     .font(.system(size: 11, weight: .medium))
                     .monospacedDigit()
                     .fixedSize()
@@ -327,8 +315,8 @@ struct MonthlyLineWidget: Widget {
             MonthlyLineWidgetView(entry: entry)
                 .containerBackground(for: .widget) { Color.clear }
         }
-        .configurationDisplayName("Aylık Özet")
-        .description("Bu ayki toplam harcama ve birikim oranı.")
+        .configurationDisplayName("Monthly Summary")
+        .description("This month’s spending and savings rate.")
         .supportedFamilies([.accessoryRectangular])
     }
 }

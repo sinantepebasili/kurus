@@ -1,6 +1,6 @@
 //
 //  BrandLogoView.swift
-//  Kuruş — Marka işareti, sol üst başlık ve uygulama ikonu dışa aktarıcısı
+//  Kuruş / Cent — Marka işareti, sol üst başlık ve uygulama ikonu dışa aktarıcısı
 //
 //  Hedef: App
 //
@@ -52,7 +52,8 @@ struct BrandHeaderView: View {
         HStack(spacing: 10) {
             KurusMarkShape(size: 20)
 
-            Text("Kuruş")
+            // Türkçe cihazda "Kuruş", diğer dillerde "Cent"
+            Text(AppLanguage.brandName)
                 .font(.system(size: 25, weight: .bold, design: .rounded))
                 .tracking(-0.7)
                 .foregroundStyle(

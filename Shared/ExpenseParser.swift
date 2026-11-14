@@ -1,16 +1,19 @@
 //
 //  ExpenseParser.swift
-//  Kuruş — Doğal dil, taksit ve Türk bankası SMS motoru
+//  Kuruş / Cent — Çift dilli (TR + EN) doğal dil, taksit, dikte ve SMS / Apple Pay motoru
 //
 //  Hedefler: App + Widget Extension
 //
 //  Örnekler:
-//   "Netflix 229"                         → Netflix · ₺229 · Abonelik (tekrarlayan)
-//   "Telefon 36000 3t"                    → Telefon · 3 × ₺12.000 · 1/3 taksit
-//   "Bilet 4500 3 taksit"                 → Bilet · 3 × ₺1.500
-//   "Kahve 145 bonus"                     → Kahve · ₺145 · Bonus kartı
+//   "Netflix 229"                          → Netflix · 229 · Abonelik (tekrarlayan)
+//   "Telefon 36000 3t" / "Tablet 12000 üç taksit"  → 3 taksit, başlık "Telefon" / "Tablet"
+//   "Laptop 1,200.00 in 4 installments"    → 4 × 300 · "Laptop"
+//   "Coffee 5 yesterday" / "Kahve 145 dün" → dünün tarihiyle
+//   "+Maaş 65000", "İade +450", "+Salary 5000", "Refund +120" → Gelir
 //   "4532 ile biten Bonus kartınızla MIGROS işyerinde 642,50 TL harcama yapılmıştır."
 //                                          → Migros · ₺642,50 · Bonus ••4532 · Market
+//   "Card ending in 4532 at Whole Foods for $84.50"
+//                                          → Whole Foods · $84.50 · ••4532 · Groceries
 //
 
 import Foundation
@@ -22,7 +25,11 @@ struct ParsedExpense: Equatable, Sendable {
     var title: String
     /// Toplam tutar (taksitliyse tüm taksitlerin toplamı)
     var amount: Decimal?
+    /// Metinde açıkça yazılan yabancı para birimi (ör. "$14.50" → "USD"). `nil` → ana para birimi.
+    var currencyCode: String?
     var installmentCount: Int = 1
+    /// 0 → bugün, -1 → "dün" / "yesterday"
+    var dayOffset: Int = 0
     var category: ExpenseCategory = .other
     var brandID: String?
     var cardLast4: String?
@@ -43,11 +50,11 @@ struct ParsedExpense: Equatable, Sendable {
     }
 
     var cardLabel: String? {
-        if isCash { return "Nakit" }
+        if isCash { return L("Nakit", "Cash") }
         switch (bankName, cardLast4) {
         case let (bank?, last4?): return "\(bank) ••\(last4)"
         case let (bank?, nil): return bank
-        case let (nil, last4?): return "Kart ••\(last4)"
+        case let (nil, last4?): return "\(L("Kart", "Card")) ••\(last4)"
         default: return nil
         }
     }
@@ -69,11 +76,13 @@ enum ExpenseParser {
         guard !raw.isEmpty else { return nil }
 
         let norm = raw.kurusNormalized
+        let normTokens = SmartCategoryMatcher.tokens(norm)
         var working = raw
         var result = ParsedExpense(rawText: raw, title: "")
 
-        // 1) Taksit: "3t", "3 t", "3 taksit", "6 taksitli"
-        //    ya da dikte: "üç taksit", "on iki taksitle" → sayı + "taksit" başlıktan da temizlenir.
+        // 1) Taksit — rakamla: "3t", "3 taksit", "6 taksitli", "3x", "3 installments", "in 4 installments"
+        //    ya da dikte: "üç taksit", "on iki taksitle", "four installments", "in twelve installments".
+        //    Sayı ve taksit kelimesi başlıktan da temizlenir ("Tablet üç" kalmaz).
         if let m = match(Patterns.installment, in: working),
            let g = m.group(1),
            let count = Int(working[g]),
@@ -85,7 +94,13 @@ enum ExpenseParser {
             working = spoken.cleaned
         }
 
-        // 2) Kartın son 4 hanesi
+        // 1b) Tarih: "dün" / "yesterday" → dün, "bugün" / "today" → bugün (kelime başlıktan çıkar)
+        if let day = extractDayWord(from: working) {
+            result.dayOffset = day.offset
+            working = day.cleaned
+        }
+
+        // 2) Kartın son 4 hanesi: "4532 ile biten", "card ending in 4532", "••4532", "**** 4532"
         for pattern in Patterns.cardLast4 {
             if let m = match(pattern, in: norm), let g = m.group(1) {
                 result.cardLast4 = String(norm[g])
@@ -101,32 +116,39 @@ enum ExpenseParser {
         // 3) Banka / kart programı
         result.bankName = Patterns.banks.first { norm.containsWord($0.keyword) }?.name
 
-        // 4) Nakit
-        result.isCash = norm.containsWord("nakit")
+        // 4) Nakit / cash
+        result.isCash = norm.containsWord("nakit") || norm.containsWord("cash")
 
-        // 4b) Gelir: başta "+" ("+Maaş 65000"), sayıya yapışık "+" ("İade +450") ya da gelir kelimeleri.
-        //     Harfe yapışık "+" ("Disney+ 349") gelir sayılmaz.
+        // 4b) Gelir: başta "+" ("+Maaş 65000", "+Salary 5000"), sayıya yapışık "+" ("İade +450",
+        //     "Refund +120") ya da gelir kelimeleri. Harfe yapışık "+" ("Disney+ 349") gelir sayılmaz.
         let incomeBySign = raw.hasPrefix("+")
-            || raw.range(of: #"(?<![\p{L}\p{N}])\+\s*\d"#, options: .regularExpression) != nil
-        let normTokens = SmartCategoryMatcher.tokens(norm)
+            || raw.range(of: #"(?<![\p{L}\p{N}])\+\s*[$€£₺]?\s*\d"#, options: .regularExpression) != nil
         let incomeByWord = SmartCategoryMatcher.matches(tokens: normTokens, keywords: Patterns.incomeWords)
         let isIncome = incomeBySign || incomeByWord
         if isIncome { result.installmentCount = 1 }
 
-        // 5) Tutar — önce TL/TRY/₺ ile etiketli olan, yoksa en büyük sayı
+        // 5) Tutar ve para birimi — önce para birimiyle etiketli olan ("642,50 TL", "$14.50",
+        //    "USD 25.00", "EUR 40", "£12.99", "5 dollars"), yoksa en büyük sayı.
         let candidates: [Candidate] = matches(Patterns.number, in: working).compactMap { m in
             guard let g = m.group(1), let value = decimal(from: String(working[g])), value > 0 else { return nil }
-            return Candidate(value: value, tagged: isCurrencyTagged(g, in: working), range: m.whole)
+            let tag = currencyTag(for: m.whole, in: working)
+            return Candidate(value: value, currency: tag?.code, range: tag?.range ?? m.whole)
         }
-        if let chosen = candidates.first(where: { $0.tagged }) ?? candidates.max(by: { $0.value < $1.value }) {
+        if let chosen = candidates.first(where: { $0.currency != nil }) ?? candidates.max(by: { $0.value < $1.value }) {
             result.amount = chosen.value
+            if let code = chosen.currency, code != Money.homeCurrency {
+                result.currencyCode = code
+            }
             working.replaceSubrange(chosen.range, with: " ")
         }
 
-        // 6) SMS mi?
-        result.isFromSMS = result.cardLast4 != nil
-            || norm.contains("isyeri")
+        // 6) Bildirim mi? (Türk banka SMS'i ya da İngilizce banka / Apple Pay bildirimi)
+        let isTurkishSMS = norm.contains("isyeri")
             || (norm.contains("harcama") && norm.contains("kart"))
+            || (result.cardLast4 != nil && norm.contains("biten"))
+        let isEnglishSMS = SmartCategoryMatcher.matches(tokens: normTokens, keywords: Patterns.englishNoticeWords)
+            || (result.cardLast4 != nil && !isTurkishSMS)
+        result.isFromSMS = result.cardLast4 != nil || isTurkishSMS || isEnglishSMS
 
         // 7) Marka
         let brand = BrandEngine.detect(inNormalized: norm)
@@ -136,19 +158,22 @@ enum ExpenseParser {
         let title: String
         if let brand {
             title = brand.name
-        } else if result.isFromSMS {
-            title = extractMerchant(from: raw) ?? "\(result.bankName ?? "Kart") harcaması"
+        } else if isTurkishSMS {
+            title = extractTurkishMerchant(from: raw)
+                ?? "\(result.bankName ?? "Kart") harcaması"
+        } else if isEnglishSMS {
+            title = extractEnglishMerchant(from: raw) ?? freeTitle(from: working)
         } else {
             title = freeTitle(from: working)
         }
 
-        // 9) Kategori ve tekrarlayan gider
+        // 9) Kategori ve tekrarlayan gider / gelir
         if isIncome {
             result.category = .income
             result.isRecurring = SmartCategoryMatcher.matches(tokens: normTokens, keywords: Patterns.recurringIncomeWords)
         } else {
             // Kategori, taksit/kart/tutar ayıklanmış metinden çıkarılır: "3 taksit" içindeki
-            // "taksi" önekinin Ulaşım'a düşmesi ("Yazıcı 4500 3 taksit" → Ulaşım) böylece engellenir.
+            // "taksi" önekinin Ulaşım'a düşmesi böylece engellenir.
             result.category = brand?.category ?? inferCategory(working.kurusNormalized) ?? .other
             result.isRecurring = (brand?.isSubscription ?? false)
                 || SmartCategoryMatcher.matches(tokens: normTokens, keywords: Patterns.recurringWords)
@@ -169,19 +194,31 @@ enum ExpenseParser {
         return nil
     }
 
-    // MARK: Dikte ile taksit
+    // MARK: Dikte ile taksit (TR + EN)
 
     private static let spokenUnits: [String: Int] = [
+        // Türkçe
         "bir": 1, "iki": 2, "uc": 3, "dort": 4, "bes": 5, "alti": 6, "yedi": 7, "sekiz": 8, "dokuz": 9,
+        // English
+        "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9,
     ]
-    private static let spokenTens: [String: Int] = ["on": 10, "yirmi": 20, "otuz": 30, "kirk": 40]
+    /// Tek başına kullanılan sayılar (EN 10–19)
+    private static let spokenTeens: [String: Int] = [
+        "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15,
+        "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19,
+    ]
+    private static let spokenTens: [String: Int] = [
+        "on": 10, "yirmi": 20, "otuz": 30, "kirk": 40,
+        "twenty": 20, "thirty": 30, "forty": 40,
+    ]
 
-    /// "Telefon 36000 üç taksit" → (3, "Telefon 36000"). "on iki taksitle" → 12, "oniki taksit" → 12.
-    /// Sayı kelimeleri ve "taksit…" kelimesi metinden çıkarılır; böylece başlığa sızmaz.
+    /// "Telefon 36000 üç taksit" → (3, "Telefon 36000") · "Laptop 1200 in four installments" → (4, "Laptop 1200")
+    /// "on iki taksitle" / "oniki taksit" / "twenty-four installments" da desteklenir.
     private static func extractSpokenInstallment(from text: String) -> (count: Int, cleaned: String)? {
         var tokens = text.split(whereSeparator: \.isWhitespace).map(String.init)
         let norms = tokens.map { $0.kurusNormalized.trimmingCharacters(in: .punctuationCharacters) }
-        guard let anchor = norms.firstIndex(where: { $0.hasPrefix("taksit") }), anchor > 0 else { return nil }
+        guard let anchor = norms.firstIndex(where: { $0.hasPrefix("taksit") || $0.hasPrefix("installment") }),
+              anchor > 0 else { return nil }
 
         let previous = norms[anchor - 1]
         var value = 0
@@ -193,25 +230,44 @@ enum ExpenseParser {
                 value += ten
                 used = 2
             }
-        } else if let ten = spokenTens[previous] {
-            value = ten
+        } else if let whole = spokenTeens[previous] ?? spokenTens[previous] {
+            value = whole
             used = 1
-        } else if let fused = fusedSpokenNumber(previous) {
-            value = fused
+        } else if let compound = compoundSpokenNumber(previous) {
+            value = compound
             used = 1
         }
 
         guard used > 0, (2...48).contains(value) else { return nil }
-        tokens.removeSubrange((anchor - used)...anchor)
+        var start = anchor - used
+        // "in four installments" → "in" de kalkar
+        if start > 0, norms[start - 1] == "in" { start -= 1 }
+        tokens.removeSubrange(start...anchor)
         return (value, tokens.joined(separator: " "))
     }
 
-    /// Bitişik dikte: "onaltı" → 16, "yirmidört" → 24
-    private static func fusedSpokenNumber(_ word: String) -> Int? {
+    /// Bitişik / tireli: "onaltı" → 16, "yirmidört" → 24, "twenty-four" → 24
+    private static func compoundSpokenNumber(_ word: String) -> Int? {
+        let pieces = word.split(separator: "-").map(String.init)
+        if pieces.count == 2, let ten = spokenTens[pieces[0]], let unit = spokenUnits[pieces[1]] {
+            return ten + unit
+        }
         for (tenWord, tenValue) in spokenTens where word.hasPrefix(tenWord) {
             if let unit = spokenUnits[String(word.dropFirst(tenWord.count))] { return tenValue + unit }
         }
         return nil
+    }
+
+    // MARK: Tarih kelimeleri
+
+    /// "Kahve 145 dün" → (-1, "Kahve 145") · "Lunch 12 yesterday" → (-1, "Lunch 12")
+    private static func extractDayWord(from text: String) -> (offset: Int, cleaned: String)? {
+        var tokens = text.split(whereSeparator: \.isWhitespace).map(String.init)
+        let norms = tokens.map { $0.kurusNormalized.trimmingCharacters(in: .punctuationCharacters) }
+        guard let index = norms.firstIndex(where: { Patterns.dayWords[$0] != nil }),
+              let offset = Patterns.dayWords[norms[index]] else { return nil }
+        tokens.remove(at: index)
+        return (offset, tokens.joined(separator: " "))
     }
 
     // MARK: Başlık
@@ -219,7 +275,8 @@ enum ExpenseParser {
     private static func freeTitle(from working: String) -> String {
         let stop: Set<String> = [
             "tl", "try", "lira", "nakit", "kart", "kartla", "kartiyla", "ile",
-            "taksit", "taksitle", "taksitli", "kredi", "harcama"
+            "taksit", "taksitle", "taksitli", "kredi", "harcama",
+            "cash", "card", "installment", "installments",
         ]
         let bankWords = Set(Patterns.banks.map { $0.keyword }.filter { !$0.contains(" ") })
         let trimSet = CharacterSet.punctuationCharacters.union(.symbols)
@@ -238,7 +295,7 @@ enum ExpenseParser {
     }
 
     /// "4532 ile biten Bonus kartınızla MIGROS TICARET A.S. işyerinde …" → "Migros"
-    private static func extractMerchant(from raw: String) -> String? {
+    private static func extractTurkishMerchant(from raw: String) -> String? {
         let tokens = raw.split(whereSeparator: \.isWhitespace).map(String.init)
         let norms = tokens.map { $0.kurusNormalized.trimmingCharacters(in: .punctuationCharacters) }
 
@@ -274,32 +331,120 @@ enum ExpenseParser {
             .capitalized(with: Locale(identifier: "tr_TR"))
     }
 
+    /// "spent $18.40 at STARBUCKS" → "Starbucks" · "Card ending in 4532 at Whole Foods for $84.50" → "Whole Foods"
+    private static func extractEnglishMerchant(from raw: String) -> String? {
+        let tokens = raw.split(whereSeparator: \.isWhitespace).map(String.init)
+        let norms = tokens.map { $0.kurusNormalized.trimmingCharacters(in: .punctuationCharacters) }
+        guard let anchor = norms.firstIndex(where: { $0 == "at" || $0 == "@" }) ?? tokens.firstIndex(of: "@"),
+              anchor + 1 < tokens.count else { return nil }
+
+        let stop: Set<String> = [
+            "for", "on", "with", "using", "via", "card", "ending", "was", "has", "have", "been",
+            "is", "your", "from", "of", "and", "approved", "declined", "today", "yesterday",
+        ]
+        let legal: Set<String> = ["inc", "llc", "ltd", "co", "corp", "plc"]
+
+        var picked: [String] = []
+        var i = anchor + 1
+        while i < tokens.count, picked.count < 4 {
+            let token = tokens[i]
+            let n = norms[i]
+            if n.isEmpty || stop.contains(n) || n.contains(where: \.isNumber)
+                || token.contains(where: { "$€£₺".contains($0) }) { break }
+            if !legal.contains(n) { picked.append(token.trimmingCharacters(in: .punctuationCharacters)) }
+            if let last = token.last, ".,;:!".contains(last) { break }
+            i += 1
+        }
+        guard !picked.isEmpty else { return nil }
+
+        let name = picked.joined(separator: " ")
+        // Yalnızca tamamı büyük/küçük harfse düzelt ("STARBUCKS" → "Starbucks"); "Whole Foods" olduğu gibi kalır.
+        let letters = name.filter(\.isLetter)
+        let uniform = letters == letters.uppercased() || letters == letters.lowercased()
+        return uniform
+            ? name.lowercased(with: Locale(identifier: "en_US")).capitalized(with: Locale(identifier: "en_US"))
+            : name
+    }
+
     // MARK: Tutar yardımcıları
 
     private struct Candidate {
         let value: Decimal
-        let tagged: Bool
+        /// Etiketlenen para birimi (ISO); `nil` → etiketsiz
+        let currency: String?
+        /// Sayı + para birimi etiketi birlikte (başlıktan birlikte silinir)
         let range: Range<String.Index>
     }
 
-    /// "1.250,75" → 1250.75 · "12.000" → 12000 · "642,50" → 642.5 · "12.5" → 12.5
+    /// Her iki ondalık sistemi de okur:
+    /// TR "1.250,75" → 1250.75 · "642,50" → 642.5 · "12.000" → 12000
+    /// EN "1,250.75" → 1250.75 · "642.50" → 642.5 · "1,250" → 1250
     static func decimal(from token: String) -> Decimal? {
         var s = token
-        if s.contains(",") {
-            s = s.replacingOccurrences(of: ".", with: "").replacingOccurrences(of: ",", with: ".")
-        } else if s.range(of: #"^\d{1,3}(\.\d{3})+$"#, options: .regularExpression) != nil {
+        let hasComma = s.contains(",")
+        let hasDot = s.contains(".")
+
+        if hasComma && hasDot {
+            // Son görünen ayırıcı ondalıktır.
+            let lastComma = s.lastIndex(of: ",")!
+            let lastDot = s.lastIndex(of: ".")!
+            if lastComma > lastDot {
+                s = s.replacingOccurrences(of: ".", with: "").replacingOccurrences(of: ",", with: ".")
+            } else {
+                s = s.replacingOccurrences(of: ",", with: "")
+            }
+        } else if hasComma {
+            // "1,250" / "12,000,000" → binlik (EN) · "642,50" → ondalık (TR)
+            if s.range(of: #"^\d{1,3}(,\d{3})+$"#, options: .regularExpression) != nil {
+                s = s.replacingOccurrences(of: ",", with: "")
+            } else {
+                s = s.replacingOccurrences(of: ",", with: ".")
+            }
+        } else if hasDot, s.range(of: #"^\d{1,3}(\.\d{3})+$"#, options: .regularExpression) != nil {
+            // "12.000" → binlik (TR) · "642.50" → ondalık (EN)
             s = s.replacingOccurrences(of: ".", with: "")
         }
         return Decimal(string: s, locale: Locale(identifier: "en_US_POSIX"))
     }
 
-    private static func isCurrencyTagged(_ range: Range<String.Index>, in text: String) -> Bool {
-        let after = text[range.upperBound...].drop(while: { $0 == " " }).prefix(4).lowercased()
-        if after.hasPrefix("tl") || after.hasPrefix("try") || after.hasPrefix("₺") || after.hasPrefix("lira") {
-            return true
+    /// Sayının hemen önünde ya da ardında para birimi var mı? Varsa ISO kodu ve sayıyla birlikte aralığı.
+    /// Sembol ($ € £ ₺) ve kod (TL, TRY, USD, EUR, GBP) iki yönde; "dolar/dollars/euro/pounds/lira"
+    /// gibi kelimeler yalnızca sayıdan SONRA geçerlidir.
+    private static func currencyTag(for range: Range<String.Index>, in text: String) -> (code: String, range: Range<String.Index>)? {
+        let isGap: (Character) -> Bool = { $0 == " " || $0 == "\u{00A0}" }
+
+        // Sonra
+        var i = range.upperBound
+        while i < text.endIndex, isGap(text[i]) { i = text.index(after: i) }
+        if i < text.endIndex {
+            if let code = Money.symbols[String(text[i])] {
+                return (code, range.lowerBound..<text.index(after: i))
+            }
+            var j = i
+            while j < text.endIndex, text[j].isLetter { j = text.index(after: j) }
+            if j > i {
+                let word = String(text[i..<j]).kurusNormalized
+                if let code = Money.codes[word] ?? Money.trailingWords[word] {
+                    return (code, range.lowerBound..<j)
+                }
+            }
         }
-        let before = String(text[..<range.lowerBound].reversed().drop(while: { $0 == " " }).prefix(2)).lowercased()
-        return before.hasPrefix("₺") || before.hasPrefix("lt")
+
+        // Önce
+        var k = range.lowerBound
+        while k > text.startIndex, isGap(text[text.index(before: k)]) { k = text.index(before: k) }
+        if k > text.startIndex {
+            let p = text.index(before: k)
+            if let code = Money.symbols[String(text[p])] {
+                return (code, p..<range.upperBound)
+            }
+            var start = k
+            while start > text.startIndex, text[text.index(before: start)].isLetter { start = text.index(before: start) }
+            if start < k, let code = Money.codes[String(text[start..<k]).kurusNormalized] {
+                return (code, start..<range.upperBound)
+            }
+        }
+        return nil
     }
 
     // MARK: Regex yardımcıları
@@ -331,16 +476,24 @@ enum ExpenseParser {
 // MARK: - Desenler ve sözlükler
 
 private enum Patterns {
-    static let installment = #"(?<![\d.,])(\d{1,2})\s*(?:taksit\w*|tk|t)(?![\p{L}\d])"#
+    /// "3t", "3 taksit", "6 taksitli", "3x", "3 installments", "in 4 installments"
+    static let installment = #"(?:\bin\s+)?(?<![\d.,])(\d{1,2})\s*(?:taksit\w*|installments?|tk|t|x)(?![\p{L}\d])"#
 
-    static let number = #"(?<![\p{L}\d.,:/])(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)(?![\d:/]|[.,]\d)"#
+    /// TR binlik "1.250,50" · EN binlik "1,250.50" · sade "642,50" / "642.50" / "36000"
+    static let number = #"(?<![\p{L}\d.,:/])(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:[.,]\d{1,2})?)(?![\d:/]|[.,]\d)"#
 
     /// Normalize edilmiş metin üzerinde çalışır.
     static let cardLast4: [String] = [
         #"(\d{4})\s*ile\s*biten"#,
+        #"ending\s*(?:in|with)?\s*:?\s*(\d{4})(?!\d)"#,
         #"(?:\*{2,}|•{2,}|x{3,})\s?(\d{4})(?!\d)"#,
         #"son\s*(?:4|dort)\s*hane\w*\s*:?\s*(\d{4})"#,
         #"(\d{4})\s*(?:no'?lu|numarali)\s*kart"#,
+    ]
+
+    /// İngilizce banka / Apple Pay bildirimlerini ele veren ifadeler
+    static let englishNoticeWords = [
+        "ending in", "card ending", "spent!", "purchase!", "transaction!", "charged!", "debit card", "credit card",
     ]
 
     /// Önce kart programları (Bonus, World…), sonra bankalar.
@@ -356,24 +509,35 @@ private enum Patterns {
         ("kuveyt turk", "Kuveyt Türk"), ("albaraka", "Albaraka"),
     ]
 
-    static let recurringWords = ["abonelik", "aylik", "uyelik", "premium"]
+    /// "dün" / "yesterday" → -1 · "bugün" / "today" → 0
+    static let dayWords: [String: Int] = ["dun": -1, "yesterday": -1, "bugun": 0, "today": 0]
+
+    static let recurringWords = ["abonelik", "aylik", "uyelik", "premium", "subscription", "monthly", "membership"]
 
     /// Gelir kelimeleri ("!" → tam kelime). "Bonus" bir kart adı olduğu için bilinçli olarak yok.
-    static let incomeWords = ["maas", "gelir", "iade", "prim!", "ikramiye", "kira geliri"]
-    static let recurringIncomeWords = ["maas", "kira geliri"]
+    static let incomeWords = [
+        "maas", "gelir", "iade", "prim!", "ikramiye", "kira geliri",
+        "salary", "income", "refund", "paycheck", "payroll", "reimbursement",
+    ]
+    static let recurringIncomeWords = ["maas", "kira geliri", "salary", "paycheck", "payroll"]
 
     struct CategoryRule {
         let category: ExpenseCategory
-        /// Doğal Türkçe yazılır; eşleştirmeden önce normalize edilir ("kulaklık" = "kulaklik").
+        /// Doğal dilde yazılır; eşleştirmeden önce normalize edilir ("kulaklık" = "kulaklik").
         /// Sonu "!" ile biten kelime yalnızca tam kelime olarak eşleşir (bkz. SmartCategoryMatcher).
         let keywords: [String]
     }
 
     /// Sıra önemlidir; ilk eşleşen kural kazanır:
-    /// "telefon faturası" → Fatura (Teknoloji'den önce) · "yarım ekmek" → Yemek (Birikim'den önce)
-    /// "tam pansiyon" → Seyahat · "metro market" → Market (Ulaşım'dan önce) · "şarj istasyonu" → Ulaşım
+    /// "rent a car" → Ulaşım ("rent" Fatura'dan önce) · "telefon faturası" → Fatura (Teknoloji'den önce)
+    /// "yarım ekmek" → Yemek (Birikim'den önce) · "uber eats" → Yemek ("uber" Ulaşım'dan önce)
+    /// "metro market" → Market · "şarj istasyonu" → Ulaşım · "gas bill" → Fatura, "gas" → Ulaşım
     static let categoryRules: [CategoryRule] = [
-        // 1. KONUT, KİRA, AİDAT, FATURA, VERGİ
+        // 0. ARAÇ KİRALAMA (Fatura'daki "rent"/"kira"dan önce yakalanmalı)
+        CategoryRule(category: .transport, keywords: [
+            "araç kiralama", "rent a car", "car rental",
+        ]),
+        // 1. KONUT, KİRA, AİDAT, FATURA, VERGİ — HOUSING & BILLS
         CategoryRule(category: .bills, keywords: [
             "kira", "ev kirası", "aidat", "site aidatı", "apartman aidatı", "depozito", "emlak",
             "kombi", "petek", "tesisat", "tadilat", "çilingir", "nakliye",
@@ -382,14 +546,19 @@ private enum Patterns {
             "internet", "fiber", "superonline", "turknet", "kablonet", "millenicom",
             "telekom", "hat faturası", "telefon faturası", "kontör",
             "vergi", "mtv", "emlak vergisi", "harç", "noter", "sigorta", "kasko", "dask",
+            // English
+            "rent", "mortgage", "hoa", "maintenance", "electricity", "electric bill", "water", "water bill",
+            "gas bill", "utility", "utilities", "wifi", "phone bill", "verizon", "tmobile", "t mobile",
+            "at&t", "att", "comcast", "xfinity", "insurance", "tax", "taxes",
         ]),
-        // 2. KAHVE
+        // 2. KAHVE — COFFEE
         CategoryRule(category: .coffee, keywords: [
             "kahve", "espresso", "latte", "americano", "cappuccino", "mocha", "filtre kahve",
             "türk kahvesi", "çay", "espresso lab", "espressolab", "tchibo", "arabica",
             "nero!", "caffe nero", "caribou", "kafe", "cafe",
+            "coffee", "dunkin", "peets", "tim hortons",
         ]),
-        // 3. YEME & İÇME
+        // 3. YEME & İÇME — FOOD
         CategoryRule(category: .food, keywords: [
             "yemek", "öğle yemeği", "akşam yemeği", "kahvaltı", "brunch", "restoran", "lokanta",
             "esnaf lokantası", "kebap", "kebab", "döner", "iskender", "lahmacun", "pide", "simit",
@@ -398,72 +567,94 @@ private enum Patterns {
             "mcdonalds", "popeyes", "kfc", "dominos", "little caesars", "arbys", "happy moons",
             "bigchefs", "midpoint", "tavuk dünyası", "baydöner",
             "getiryemek", "getir yemek", "trendyol yemek", "migros yemek",
+            // English
+            "lunch", "dinner", "breakfast", "restaurant", "chipotle", "uber eats", "doordash", "grubhub",
+            "deliveroo", "bakery", "sandwich", "tacos", "takeout",
         ]),
-        // 4. MARKET & EV
+        // 4. MARKET & EV — GROCERIES
         CategoryRule(category: .market, keywords: [
             "market", "süpermarket", "macrocenter", "macro", "carrefour", "a101", "bim", "şok",
             "file!", "tarım kredi", "metro market", "onur market", "bakkal", "büfe", "manav",
             "pazar", "kasap", "şarküteri", "kuruyemiş", "fırın", "damacana", "erikli", "sırma",
             "su!", "getirbüyük", "istegelsin", "banabi", "yemeksepeti market", "trendyol hızlı market",
             "deterjan", "temizlik", "tuvalet kağıdı", "poşet",
+            // English
+            "grocery", "groceries", "supermarket", "whole foods", "trader joes", "trader joe", "walmart",
+            "target", "costco", "aldi", "lidl", "tesco", "sainsburys", "sainsbury", "kroger", "safeway",
         ]),
-        // 5. SEYAHAT
+        // 5. SEYAHAT — TRAVEL
         CategoryRule(category: .travel, keywords: [
             "uçak", "otel", "pansiyon", "pegasus", "sunexpress", "ajet", "tatil", "airbnb",
             "booking", "vize", "pasaport", "obilet",
+            "hotel", "vacation", "visa fee",
         ]),
-        // 6. BİRİKİM & YATIRIM (harcama toplamını şişirmez)
+        // 6. BİRİKİM & YATIRIM — SAVINGS (harcama toplamını şişirmez)
         CategoryRule(category: .savings, keywords: [
             "birikim", "yatırım", "altın", "gümüş", "gram!", "çeyrek", "yarım!", "tam!", "tam altın",
             "ata altın", "cumhuriyet", "ons!", "bilezik", "kuyumcu",
             "döviz", "dolar", "euro", "sterlin", "frank", "usd", "eur",
             "hisse", "bist", "borsa", "temettü", "fon!", "tefas", "mevduat", "kumbara",
             "bes!", "bireysel emeklilik", "kripto", "bitcoin", "btc", "eth", "midas",
+            // English
+            "gold", "silver", "stock", "stocks", "etf", "sp500", "s&p 500", "s&p", "crypto", "savings",
+            "investment", "invest", "401k", "roth", "ira!", "vanguard", "fidelity", "robinhood",
         ]),
-        // 7. ULAŞIM & ARAÇ
+        // 7. ULAŞIM & ARAÇ — TRANSPORT
         CategoryRule(category: .transport, keywords: [
             "benzin", "mazot", "motorin", "dizel", "lpg", "otogaz", "yakıt", "akaryakıt",
             "şarj istasyonu", "zes", "trugo", "shell", "opet", "petrol", "petrol ofisi", "bp",
             "aytemiz", "go yakıt", "otopark", "ispark", "vale", "oto yıkama",
             "hgs", "ogs", "otoyol", "köprü", "avrasya", "osmangazi",
-            "lastik", "jant", "periyodik bakım", "tüvtürk", "çekici", "araç kiralama", "rent a car",
+            "lastik", "jant", "periyodik bakım", "tüvtürk", "çekici",
             "taksi", "bitaksi", "uber", "martı", "binbin",
             "otobüs", "metro", "metrobüs", "tramvay", "izban", "marmaray", "vapur", "feribot",
             "ido", "budo", "istanbulkart", "izmirimkart", "ankarakart", "akbil", "dolmuş", "minibüs",
             "tren", "yht", "kamil koç",
+            // English
+            "lyft", "taxi", "cab", "gas", "fuel", "chevron", "exxon", "parking", "toll", "subway",
+            "train", "flight", "airline", "delta", "united", "bus", "ferry",
         ]),
-        // 8. ABONELİK & DİJİTAL SERVİSLER
+        // 8. ABONELİK & DİJİTAL SERVİSLER — SUBSCRIPTIONS
         CategoryRule(category: .subscription, keywords: [
             "abonelik", "üyelik", "apple music", "apple one", "app store", "google one",
             "prime!", "blutv", "exxen", "gain!", "mubi", "tod!", "beinsports", "tabii",
             "claude", "copilot", "cursor", "midjourney", "adobe", "canva", "notion",
+            "subscription", "membership", "hbo", "hulu", "paramount", "peacock",
         ]),
-        // 9. EĞLENCE
+        // 9. EĞLENCE — ENTERTAINMENT
         CategoryRule(category: .entertainment, keywords: [
-            "sinema", "bilet", "konser", "tiyatro", "steam", "oyun", "bowling", "müze",
+            "sinema", "bilet", "konser", "tiyatro", "oyun", "bowling", "müze",
             "maç bileti", "festival",
+            "movie", "cinema", "concert", "theater", "theatre", "tickets", "museum",
         ]),
-        // 10. SAĞLIK & ECZANE
+        // 10. SAĞLIK & ECZANE — HEALTH
         CategoryRule(category: .health, keywords: [
             "eczane", "ilaç", "vitamin", "doktor", "hastane", "muayene", "tahlil", "diş!", "dişçi",
             "diş hekimi", "dişhekimi", "gözlük", "optik", "lens", "fizyoterapi", "diyetisyen",
             "psikolog", "masaj", "spor salonu", "gym!", "macfit", "pilates", "veteriner",
+            // English
+            "pharmacy", "cvs", "walgreens", "boots", "medicine", "doctor", "dentist", "hospital",
+            "clinic", "fitness", "vet", "therapy",
         ]),
-        // 11. EĞİTİM
+        // 11. EĞİTİM — EDUCATION
         CategoryRule(category: .education, keywords: [
             "kurs", "kitap", "okul", "udemy", "eğitim", "kırtasiye", "ders",
+            "course", "tuition", "books", "school",
         ]),
-        // 12. TEKNOLOJİ & ELEKTRONİK
+        // 12. TEKNOLOJİ & ELEKTRONİK — TECH
         CategoryRule(category: .technology, keywords: [
             "tablet", "ipad", "iphone", "telefon", "macbook", "laptop", "bilgisayar", "monitör",
             "ekran", "klavye", "mouse", "fare!", "kulaklık", "airpods", "şarj", "kablo", "adaptör",
             "powerbank", "batarya", "pil!", "akıllı saat", "apple watch", "yazıcı", "printer",
             "kartuş", "toner", "kamera", "tv!", "televizyon", "playstation", "konsol", "samsung",
             "xiaomi", "teknosa", "mediamarkt", "media markt", "vatan bilgisayar", "itopya", "gürgençler",
+            // English
+            "phone", "monitor", "headphones", "charger", "cable", "console", "steam", "apple", "best buy",
+            "amazon", "keyboard", "camera",
         ]),
-        // 13. ALIŞVERİŞ: GİYİM, KİŞİSEL BAKIM, EV, EVCİL HAYVAN
+        // 13. ALIŞVERİŞ: GİYİM, KİŞİSEL BAKIM, EV, EVCİL HAYVAN — SHOPPING
         CategoryRule(category: .shopping, keywords: [
-            "amazon", "n11", "çiçeksepeti", "ikea", "koçtaş", "bauhaus", "decathlon",
+            "n11", "çiçeksepeti", "ikea", "koçtaş", "bauhaus", "decathlon",
             "zara", "bershka", "pull and bear", "pull&bear", "massimo dutti", "stradivarius", "mango",
             "h&m", "hm!", "mavi!", "koton", "lcw", "lc waikiki", "defacto", "boyner", "beymen", "vakko",
             "nike", "adidas", "puma", "skechers", "new balance", "camper",
@@ -473,6 +664,8 @@ private enum Patterns {
             "maskara", "parfüm", "krem", "şampuan",
             "berber", "kuaför", "tıraş", "cilt bakımı",
             "mama", "kedi maması", "köpek maması", "kedi kumu", "petshop",
+            // English
+            "clothing", "clothes", "shoes", "barber", "haircut", "pet!", "pet food", "petco", "uniqlo",
         ]),
     ]
 }
@@ -482,9 +675,9 @@ private enum Patterns {
 /// Token (kelime) tabanlı eşleştirici; `.contains()` alt-dize tuzaklarını önler.
 ///
 /// • Metin ve anahtar kelime aynı biçimde normalize edilir, harf/rakam dışı karakterlerden bölünür.
-/// • Tek kelime: tam eşleşme ya da (≥4 harfli köklerde) Türkçe çekim eki için önek eşleşmesi.
-///   "taksi" → "taksi", "taksiye" ✓ — "taksit" ✗ · "tablet" ≠ "et" · "fon" ≠ "fondöten"
-/// • Çok kelime ("ev kirası"): ardışık kelimeler; yalnızca son kelimeye çekim eki izni.
+/// • Tek kelime: tam eşleşme ya da (≥4 harfli köklerde) çekim eki için önek eşleşmesi.
+///   "taksi" → "taksi", "taksiye" ✓ — "taksit" ✗ · "rent" ≠ "different" · "fon" ≠ "fondöten"
+/// • Çok kelime ("ev kirası", "whole foods"): ardışık kelimeler; yalnızca son kelimeye ek izni.
 /// • Sonu "!" ile biten anahtar kelime yalnızca tam kelime olarak eşleşir.
 enum SmartCategoryMatcher {
 
@@ -499,6 +692,12 @@ enum SmartCategoryMatcher {
         "pazar": ["pazarl", "pazart"],  // pazarlama, pazartesi ≠ pazar alışverişi
         "vale": ["valen"],              // Valentino ≠ vale
         "frank": ["frankf"],            // Frankfurt ≠ İsviçre frangı
+        "rent": ["rental"],             // car rental ayrı kuralda
+        "train": ["trainer"],           // personal trainer ≠ tren
+        "apple": ["applebee"],          // Applebee's ≠ Apple
+        "water": ["waterm"],            // watermelon ≠ su faturası
+        "stock": ["stocking"],          // stockings ≠ hisse
+        "gold": ["golden"],             // Golden Krust ≠ altın
     ]
 
     static func tokens(_ normalized: String) -> [String] {
@@ -546,7 +745,7 @@ enum SmartCategoryMatcher {
 // MARK: - Metin yardımcıları
 
 extension String {
-    /// Türkçe duyarlı normalize: küçük harf, aksansız ("Türk Telekom" → "turk telekom", "MIGROS" → "migros").
+    /// Dil duyarlı normalize: küçük harf, aksansız ("Türk Telekom" → "turk telekom", "MIGROS" → "migros").
     var kurusNormalized: String {
         self.replacingOccurrences(of: "ı", with: "i")
             .replacingOccurrences(of: "İ", with: "i")
@@ -558,14 +757,18 @@ extension String {
     /// Harf/rakam sınırlarına saygılı kelime araması (normalize metinde).
     func containsWord(_ word: String, prefixOnly: Bool = false) -> Bool {
         let escaped = NSRegularExpression.escapedPattern(for: word)
-        // \b kelime sınırı: anahtar kelime ancak bir kelimenin BAŞINDA eşleşir ("yazici" içindeki
-        // alt diziler başka kurallara düşmez). prefixOnly=false ise kelimenin tamamı eşleşmelidir.
+        // \b kelime sınırı: anahtar kelime ancak bir kelimenin BAŞINDA eşleşir.
+        // prefixOnly=false ise kelimenin tamamı eşleşmelidir.
         let pattern = "\\b" + escaped + (prefixOnly ? "" : "\\b")
         return range(of: pattern, options: .regularExpression) != nil
     }
 
+    /// İlk harfi cihaz diline göre büyütür (tr: "istanbul" → "İstanbul", en: "ikea" → "Ikea").
+    /// İlk kelimede zaten büyük harf varsa ("iPad", "iPhone", "eBay") dokunmaz.
     var capitalizedFirstTR: String {
-        guard let first else { return self }
-        return String(first).uppercased(with: Locale(identifier: "tr_TR")) + dropFirst()
+        guard let first, first.isLowercase else { return self }
+        let firstWord = prefix { !$0.isWhitespace }
+        if firstWord.contains(where: \.isUppercase) { return self }
+        return String(first).uppercased(with: .current) + dropFirst()
     }
 }

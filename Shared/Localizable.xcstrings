@@ -1,0 +1,156 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "Add Expense": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Harcama Ekle"
+          }
+        }
+      }
+    },
+    "Logs a short note (“Coffee 5”, “Laptop 1200 3x”) or a full bank SMS / Apple Pay notification as an expense.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kısa bir notu (“Kahve 145”, “Telefon 36000 3t”) ya da bir banka SMS’inin / Apple Pay bildiriminin tamamını harcama olarak kaydeder."
+          }
+        }
+      }
+    },
+    "Expenses": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Harcamalar"
+          }
+        }
+      }
+    },
+    "Expense Text": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Harcama Metni"
+          }
+        }
+      }
+    },
+    "E.g. “Coffee 5” or a full bank SMS": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Örn. “Kahve 145” ya da banka SMS’inin tamamı"
+          }
+        }
+      }
+    },
+    "What did you spend? For example “Coffee 5”.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ne harcadın? Örneğin “Kahve 145”."
+          }
+        }
+      }
+    },
+    "Log ${text}": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${text} harcamasını ekle"
+          }
+        }
+      }
+    },
+    "Quick Add": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hızlı Ekle"
+          }
+        }
+      }
+    },
+    "Your monthly total and one-tap logging.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aylık toplamın ve tek dokunuşla kayıt."
+          }
+        }
+      }
+    },
+    "7-Day Pulse": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 Günlük İvme"
+          }
+        }
+      }
+    },
+    "Your spending rhythm over the last seven days.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son yedi günün harcama ritmi."
+          }
+        }
+      }
+    },
+    "Budget Ring": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bütçe Halkası"
+          }
+        }
+      }
+    },
+    "A ring that fills against your monthly limit.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aylık limitine göre dolan halka."
+          }
+        }
+      }
+    },
+    "Monthly Summary": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aylık Özet"
+          }
+        }
+      }
+    },
+    "This month’s spending and savings rate.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu ayki harcama ve birikim oranı."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

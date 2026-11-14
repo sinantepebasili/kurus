@@ -1,6 +1,6 @@
 //
 //  CategoryBreakdownSheet.swift
-//  Kuruş — Seçili ayın gerçek harcamaları için ince halka grafik (Sağlık / Fitness estetiği)
+//  Kuruş / Cent — Seçili ayın gerçek harcamaları için ince halka grafik (Sağlık / Fitness estetiği)
 //
 //  Hedef: App
 //
@@ -92,12 +92,12 @@ struct CategoryBreakdownSheet: View {
             }
             .scrollIndicators(.hidden)
             .background(Theme.surface)
-            .navigationTitle("Kategori Dağılımı")
+            .navigationTitle(L("Kategori Dağılımı", "Category Breakdown"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Theme.surface, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Bitti") { dismiss() }
+                    Button(L("Bitti", "Done")) { dismiss() }
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Theme.emerald)
                 }
@@ -136,7 +136,7 @@ struct CategoryBreakdownSheet: View {
             .rotationEffect(.degrees(-90))
 
             VStack(spacing: 4) {
-                Text(focusedSlice?.category.title ?? (isProjection ? "Tahmini Yük" : "Gerçek Harcama"))
+                Text(focusedSlice?.category.title ?? (isProjection ? L("Tahmini Yük", "Projected") : L("Gerçek Harcama", "Spending")))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(focusedSlice?.category.color ?? Theme.textSecondary)
                     .contentTransition(.interpolate)
@@ -202,7 +202,7 @@ struct CategoryBreakdownSheet: View {
             Image(systemName: "chart.pie")
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(Theme.textMuted)
-            Text(isProjection ? "Bu ay için planlı ödeme yok" : "Bu dönemde harcama yok")
+            Text(isProjection ? L("Bu ay için planlı ödeme yok", "Nothing scheduled this month") : L("Bu dönemde harcama yok", "No spending in this period"))
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.textPrimary)
         }
@@ -210,15 +210,20 @@ struct CategoryBreakdownSheet: View {
     }
 
     private var footnote: String {
-        var text = "Birikim / yatırım ve gelir kayıtları bu dağılıma dahil değildir."
+        var text = L(
+            "Birikim / yatırım, gelir ve yabancı para birimli kayıtlar bu dağılıma dahil değildir.",
+            "Savings, income and foreign-currency entries are not included in this breakdown."
+        )
         if isProjection {
-            text += " Gelecek ay; kayıtlı taksitler ve abonelik tahminlerinden oluşur."
+            text += L(
+                " Gelecek ay; kayıtlı taksitler ve abonelik tahminlerinden oluşur.",
+                " Future months are built from scheduled installments and projected subscriptions."
+            )
         }
         return text
     }
 
     private func percent(_ share: Double) -> String {
-        if share > 0, share < 0.01 { return "<%1" }
-        return "%\(Int((share * 100).rounded()))"
+        Percent.string(share)
     }
 }

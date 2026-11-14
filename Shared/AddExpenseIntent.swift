@@ -1,6 +1,6 @@
 //
 //  AddExpenseIntent.swift
-//  Kuruş — Siri, Kestirmeler, SMS otomasyonu ve interaktif widget butonları
+//  Kuruş / Cent — Siri, Kestirmeler, SMS otomasyonu ve interaktif widget butonları
 //
 //  Hedefler: App + Widget Extension
 //  (Widget içindeki Button(intent:) bu intent'i uygulamayı açmadan arka planda çalıştırır.)
@@ -10,22 +10,23 @@ import AppIntents
 import SwiftUI
 
 struct AddExpenseIntent: AppIntent {
-    static let title: LocalizedStringResource = "Harcama Ekle"
+    // Sabit metinler Localizable.xcstrings'ten gelir (kaynak dil: en, çeviri: tr).
+    static let title: LocalizedStringResource = "Add Expense"
     static let description = IntentDescription(
-        "Kısa bir metni (“Kahve 145”, “Telefon 36000 3t”) ya da bir banka SMS’inin tamamını Kuruş’a harcama olarak kaydeder.",
-        categoryName: "Harcamalar"
+        "Logs a short note (“Coffee 5”, “Laptop 1200 3x”) or a full bank SMS / Apple Pay notification as an expense.",
+        categoryName: "Expenses"
     )
     static let openAppWhenRun: Bool = false
 
     @Parameter(
-        title: "Harcama Metni",
-        description: "Örn. “Kahve 145” ya da banka SMS’inin tamamı",
-        requestValueDialog: IntentDialog("Ne harcadın? Örneğin “Kahve 145”.")
+        title: "Expense Text",
+        description: "E.g. “Coffee 5” or a full bank SMS",
+        requestValueDialog: IntentDialog("What did you spend? For example “Coffee 5”.")
     )
     var text: String
 
     static var parameterSummary: some ParameterSummary {
-        Summary("\(\.$text) harcamasını Kuruş’a ekle")
+        Summary("Log \(\.$text)")
     }
 
     init() {}
@@ -47,12 +48,19 @@ struct AddExpenseIntent: AppIntent {
         let monthSpend = Ledger.spending(Ledger.inMonth(store.expenses))
         let card = first.cardID.flatMap { store.card(id: $0) }
 
-        var message = "\(first.title) · \(CurrencyFormat.string(first.amount)) kaydedildi."
+        let amount = CurrencyFormat.string(first.amount, currency: first.currencyCode)
+        var message = L("\(first.title) · \(amount) kaydedildi.", "\(first.title) · \(amount) logged.")
         if let installment = first.installment {
-            message = "\(first.title) · \(installment.count) taksit × \(CurrencyFormat.string(first.amount)) kaydedildi."
+            message = L(
+                "\(first.title) · \(installment.count) taksit × \(amount) kaydedildi.",
+                "\(first.title) · \(installment.count) installments × \(amount) logged."
+            )
         }
         if first.category.isIncome {
-            message = "\(first.title) · +\(CurrencyFormat.string(first.amount)) gelir olarak kaydedildi."
+            message = L(
+                "\(first.title) · +\(amount) gelir olarak kaydedildi.",
+                "\(first.title) · +\(amount) logged as income."
+            )
         }
 
         return .result(
@@ -73,7 +81,10 @@ enum KurusIntentError: Error, CustomLocalizedStringResourceConvertible {
     var localizedStringResource: LocalizedStringResource {
         switch self {
         case .amountNotFound:
-            "Metinde bir tutar bulamadım. “Kahve 145” gibi yazmayı dene."
+            LocalizedStringResource(stringLiteral: L(
+                "Metinde bir tutar bulamadım. “Kahve 145” gibi yazmayı dene.",
+                "I couldn’t find an amount. Try something like “Coffee 5”."
+            ))
         }
     }
 }
@@ -88,8 +99,8 @@ struct ExpenseSnippetView: View {
 
     private var subtitle: String {
         var parts = [expense.category.title]
-        parts.append(card?.pillTitle ?? "Nakit")
-        if let installment = expense.installment { parts.append("Taksit \(installment.label)") }
+        parts.append(card?.pillTitle ?? L("Nakit", "Cash"))
+        if let installment = expense.installment { parts.append("\(L("Taksit", "Installment")) \(installment.label)") }
         return parts.joined(separator: " · ")
     }
 
@@ -125,13 +136,14 @@ struct ExpenseSnippetView: View {
                 size: 34,
                 weight: .bold,
                 color: expense.category.isIncome ? Theme.emerald : Theme.textPrimary,
-                prefix: expense.category.isIncome ? "+" : ""
+                prefix: expense.category.isIncome ? "+" : "",
+                currency: expense.currencyCode
             )
 
             VStack(alignment: .leading, spacing: 6) {
                 CapsuleMeter(progress: progress, tint: progress > 1 ? Theme.coral : Theme.emerald)
                 HStack {
-                    Text("Bu ay")
+                    Text(L("Bu ay", "This month"))
                     Spacer()
                     Text("\(CurrencyFormat.string(monthSpend, fraction: false)) / \(CurrencyFormat.string(budget, fraction: false))")
                         .monospacedDigit()

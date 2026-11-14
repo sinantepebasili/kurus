@@ -1,6 +1,6 @@
 //
 //  ExportManager.swift
-//  Kuruş — PDF ekstre (ImageRenderer) ve Excel/CSV dışa aktarımı (ShareLink)
+//  Kuruş / Cent — PDF ekstre (ImageRenderer) ve Excel/CSV dışa aktarımı (ShareLink)
 //
 //  Hedef: App
 //
@@ -39,7 +39,7 @@ struct PDFExport: Transferable, Sendable {
 
 enum ExportError: LocalizedError {
     case renderFailed
-    var errorDescription: String? { "Ekstre oluşturulamadı." }
+    var errorDescription: String? { L("Ekstre oluşturulamadı.", "Couldn’t create the statement.") }
 }
 
 // MARK: - Üretici
@@ -50,14 +50,19 @@ enum ExportManager {
         let month = KurusDate.monthYear(date)
             .kurusNormalized
             .replacingOccurrences(of: " ", with: "-")
-        return "Kurus-\(month)"
+        return "\(AppLanguage.brandSlug)-\(month)"
     }
 
-    // MARK: CSV — Türkçe Excel uyumlu (";" ayırıcı, "," ondalık, UTF-8 BOM)
+    // MARK: CSV — Yerel Excel uyumlu (UTF-8 BOM)
+    // Ondalık ayırıcı "," olan yerel ayarlarda (tr, de…) alan ayırıcı ";", aksi halde ",".
 
     static func writeCSV(_ export: CSVExport) throws -> URL {
         let cardNames = Dictionary(uniqueKeysWithValues: export.cards.map { ($0.id, $0.pillTitle) })
-        var lines = ["Tarih;Saat;Açıklama;Kategori;Tutar (TRY);Kart;Taksit;Tekrarlayan;Not"]
+        let separator = CurrencyFormat.style().decimal == "," ? ";" : ","
+        let header = AppLanguage.isTurkish
+            ? ["Tarih", "Saat", "Açıklama", "Kategori", "Tutar", "Para Birimi", "Kart", "Taksit", "Tekrarlayan", "Not"]
+            : ["Date", "Time", "Description", "Category", "Amount", "Currency", "Card", "Installment", "Recurring", "Note"]
+        var lines = [header.joined(separator: separator)]
 
         for e in export.expenses.sorted(by: { $0.date < $1.date }) {
             let row = [
@@ -65,13 +70,14 @@ enum ExportManager {
                 KurusDate.time(e.date),
                 e.title,
                 e.category.title,
-                CurrencyFormat.plain(e.amount),
-                e.cardID.flatMap { cardNames[$0] } ?? "Nakit",
+                (e.category.isIncome ? "" : "-") + CurrencyFormat.plain(e.amount),
+                e.currencyCode ?? Money.homeCurrency,
+                e.cardID.flatMap { cardNames[$0] } ?? L("Nakit", "Cash"),
                 e.installment?.label ?? "",
-                e.isRecurring ? "Evet" : "Hayır",
+                e.isRecurring ? L("Evet", "Yes") : L("Hayır", "No"),
                 e.note ?? "",
-            ].map(csvField)
-            lines.append(row.joined(separator: ";"))
+            ].map { csvField($0, separator: separator) }
+            lines.append(row.joined(separator: separator))
         }
 
         let csv = "\u{FEFF}" + lines.joined(separator: "\r\n")
@@ -81,8 +87,8 @@ enum ExportManager {
         return url
     }
 
-    private static func csvField(_ value: String) -> String {
-        let needsQuotes = value.contains(";") || value.contains("\"") || value.contains("\n")
+    private static func csvField(_ value: String, separator: String) -> String {
+        let needsQuotes = value.contains(separator) || value.contains("\"") || value.contains("\n")
         guard needsQuotes else { return value }
         return "\"" + value.replacingOccurrences(of: "\"", with: "\"\"") + "\""
     }
@@ -138,21 +144,21 @@ struct StatementPDFView: View {
         let saved = Ledger.savings(expenses)
         let rows = expenses.sorted { $0.date > $1.date }
         let visible = Array(rows.prefix(maxRows))
-        let usage = budget > 0 ? Int(((spend / budget).doubleValue * 100).rounded()) : 0
+        let usage = budget > 0 ? (spend / budget).doubleValue : 0
 
         VStack(alignment: .leading, spacing: 0) {
             // Başlık
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Kuruş")
+                    Text(AppLanguage.brandName)
                         .font(.system(size: 26, weight: .bold))
                         .foregroundStyle(ink)
-                    Text("Hesap Ekstresi · \(KurusDate.monthYear(month))")
+                    Text(L("Hesap Ekstresi · \(KurusDate.monthYear(month))", "Statement · \(KurusDate.monthYear(month))"))
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(sub)
                 }
                 Spacer()
-                Text("Oluşturma: \(KurusDate.numeric(.now))")
+                Text(L("Oluşturma: \(KurusDate.numeric(.now))", "Created: \(KurusDate.numeric(.now))"))
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(sub)
                     .monospacedDigit()
@@ -162,9 +168,9 @@ struct StatementPDFView: View {
 
             // Özet
             HStack(spacing: 10) {
-                stat("Gerçek Harcama", spend, tint: ink)
-                stat("Birikim / Yatırım", saved, tint: Theme.violet)
-                stat("Bütçe · %\(usage)", budget, tint: sub)
+                stat(L("Gerçek Harcama", "Spending"), spend, tint: ink)
+                stat(L("Birikim / Yatırım", "Savings / Investing"), saved, tint: Theme.violet)
+                stat(L("Bütçe", "Budget") + " · " + Percent.string(usage), budget, tint: sub)
             }
 
             // Kategori dağılımı
@@ -181,7 +187,7 @@ struct StatementPDFView: View {
             .padding(.top, 22)
 
             if rows.count > visible.count {
-                Text("+ \(rows.count - visible.count) harcama daha · tam liste CSV dışa aktarımında")
+                Text(L("+ \(rows.count - visible.count) harcama daha · tam liste CSV dışa aktarımında", "+ \(rows.count - visible.count) more · full list in the CSV export"))
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(sub)
                     .padding(.top, 8)
@@ -191,9 +197,9 @@ struct StatementPDFView: View {
 
             Rectangle().fill(rule).frame(height: 1).padding(.bottom, 10)
             HStack {
-                Text("Bu ekstre cihazınızda oluşturuldu. Hiçbir veri bir sunucuya gönderilmedi.")
+                Text(L("Bu ekstre cihazınızda oluşturuldu. Hiçbir veri bir sunucuya gönderilmedi.", "This statement was created on your device. No data was sent to any server."))
                 Spacer()
-                Text("kurus")
+                Text(AppLanguage.brandSlug.lowercased())
             }
             .font(.system(size: 8.5, weight: .medium))
             .foregroundStyle(sub)
@@ -225,7 +231,7 @@ struct StatementPDFView: View {
             .prefix(4)
 
         return VStack(alignment: .leading, spacing: 7) {
-            Text("KATEGORİLER")
+            Text(L("KATEGORİLER", "CATEGORIES"))
                 .font(.system(size: 8, weight: .semibold))
                 .tracking(0.6)
                 .foregroundStyle(sub)
@@ -241,7 +247,7 @@ struct StatementPDFView: View {
                         .fill(item.category.color.opacity(0.85))
                         .frame(width: max(4, 260 * share), height: 5)
                     Spacer(minLength: 4)
-                    Text("%\(Int((share * 100).rounded()))")
+                    Text(Percent.string(share))
                         .font(.system(size: 9, weight: .medium))
                         .foregroundStyle(sub)
                         .monospacedDigit()
@@ -254,11 +260,11 @@ struct StatementPDFView: View {
 
     private var tableHeader: some View {
         HStack(spacing: 8) {
-            Text("TARİH").frame(width: 52, alignment: .leading)
-            Text("AÇIKLAMA").frame(maxWidth: .infinity, alignment: .leading)
-            Text("KATEGORİ").frame(width: 70, alignment: .leading)
-            Text("KART").frame(width: 84, alignment: .leading)
-            Text("TUTAR").frame(width: 80, alignment: .trailing)
+            Text(L("TARİH", "DATE")).frame(width: 52, alignment: .leading)
+            Text(L("AÇIKLAMA", "DESCRIPTION")).frame(maxWidth: .infinity, alignment: .leading)
+            Text(L("KATEGORİ", "CATEGORY")).frame(width: 70, alignment: .leading)
+            Text(L("KART", "CARD")).frame(width: 84, alignment: .leading)
+            Text(L("TUTAR", "AMOUNT")).frame(width: 80, alignment: .trailing)
         }
         .font(.system(size: 8, weight: .semibold))
         .tracking(0.5)
@@ -288,7 +294,7 @@ struct StatementPDFView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Text(e.category.title).frame(width: 70, alignment: .leading).foregroundStyle(sub)
-            Text(card?.pillTitle ?? "Nakit")
+            Text(card?.pillTitle ?? L("Nakit", "Cash"))
                 .lineLimit(1)
                 .frame(width: 84, alignment: .leading)
                 .foregroundStyle(sub)
@@ -298,7 +304,8 @@ struct StatementPDFView: View {
                 size: 10,
                 weight: .semibold,
                 color: e.category.isIncome ? Theme.emerald : (e.category.isSavings ? Theme.violet : ink),
-                prefix: e.category.isIncome ? "+" : ""
+                prefix: e.category.isIncome ? "+" : "",
+                currency: e.currencyCode
             )
                 .frame(width: 80, alignment: .trailing)
         }

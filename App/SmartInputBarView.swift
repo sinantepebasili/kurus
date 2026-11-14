@@ -1,6 +1,6 @@
 //
 //  SmartInputBarView.swift
-//  Kuruş — Klavyenin üstünde yaşayan akıllı komut çubuğu ve canlı cam hap
+//  Kuruş / Cent — Klavyenin üstünde yaşayan akıllı komut çubuğu ve canlı cam hap
 //
 //  Hedef: App
 //
@@ -38,8 +38,8 @@ struct SmartInputBarView: View {
                         .foregroundStyle(isDemoTyping ? Theme.amber : Theme.textMuted)
                         .contentTransition(.symbolEffect(.replace))
 
-                    TextField(text: $text, prompt: Text("Netflix 229, Kahve 145…").foregroundStyle(Theme.textMuted)) {
-                        Text("Harcama")
+                    TextField(text: $text, prompt: Text(QuickSamples.placeholder).foregroundStyle(Theme.textMuted)) {
+                        Text(L("Harcama", "Expense"))
                     }
                     .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(Theme.textPrimary)
@@ -59,7 +59,7 @@ struct SmartInputBarView: View {
                                 .foregroundStyle(Theme.textMuted)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Temizle")
+                        .accessibilityLabel(L("Temizle", "Clear"))
                         .transition(.opacity)
                     }
                 }
@@ -82,7 +82,7 @@ struct SmartInputBarView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!isValid)
-                .accessibilityLabel("Kaydet")
+                .accessibilityLabel(L("Kaydet", "Save"))
             }
             .padding(.horizontal, Theme.gutter)
             .padding(.top, 10)
@@ -154,13 +154,16 @@ struct LiveParsePill: View {
         HStack(spacing: 5) {
             ParseTag(symbol: parsed.category.symbol, text: compact ? nil : parsed.category.title, tint: parsed.category.color)
             if parsed.installmentCount > 1 {
-                ParseTag(symbol: "square.stack.3d.up.fill", text: "\(parsed.installmentCount) taksit", tint: Theme.amber)
+                ParseTag(symbol: "square.stack.3d.up.fill", text: L("\(parsed.installmentCount) taksit", "\(parsed.installmentCount)x"), tint: Theme.amber)
+            }
+            if parsed.dayOffset == -1 {
+                ParseTag(symbol: "calendar", text: compact ? nil : L("Dün", "Yesterday"), tint: Theme.textSecondary)
             }
             if let card = compact ? parsed.compactCardLabel : parsed.cardLabel {
                 ParseTag(symbol: parsed.isCash ? "banknote.fill" : "creditcard.fill", text: card, tint: Theme.ocean)
             }
             if parsed.isRecurring {
-                ParseTag(symbol: "repeat", text: compact ? nil : (parsed.isIncome ? "Aylık" : "Abonelik"), tint: Theme.violet)
+                ParseTag(symbol: "repeat", text: compact ? nil : (parsed.isIncome ? L("Aylık", "Monthly") : L("Abonelik", "Subscription")), tint: Theme.violet)
             }
         }
     }
@@ -170,8 +173,11 @@ struct LiveParsePill: View {
         VStack(alignment: .trailing, spacing: 2) {
             if let amount = parsed.amount, amount > 0 {
                 if parsed.installmentCount > 1, let per = parsed.perInstallment {
-                    AmountText(amount: per, size: 17, weight: .bold)
-                    Text("1/\(parsed.installmentCount) · toplam \(CurrencyFormat.string(amount, fraction: false))")
+                    AmountText(amount: per, size: 17, weight: .bold, currency: parsed.currencyCode)
+                    Text(L(
+                        "1/\(parsed.installmentCount) · toplam \(CurrencyFormat.string(amount, fraction: false, currency: parsed.currencyCode))",
+                        "1/\(parsed.installmentCount) · total \(CurrencyFormat.string(amount, fraction: false, currency: parsed.currencyCode))"
+                    ))
                         .font(.system(size: 10.5, weight: .medium))
                         .foregroundStyle(Theme.textSecondary)
                         .monospacedDigit()
@@ -183,11 +189,12 @@ struct LiveParsePill: View {
                         size: 17,
                         weight: .bold,
                         color: parsed.isIncome ? Theme.emerald : Theme.textPrimary,
-                        prefix: parsed.isIncome ? "+" : ""
+                        prefix: parsed.isIncome ? "+" : "",
+                        currency: parsed.currencyCode
                     )
                 }
             } else {
-                Text("tutar?")
+                Text(L("tutar?", "amount?"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.amber)
             }

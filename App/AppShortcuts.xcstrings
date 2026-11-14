@@ -1,0 +1,36 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "Log an expense in ${applicationName}": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} ile harcama ekle"
+          }
+        }
+      }
+    },
+    "Add an expense to ${applicationName}": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName}’a harcama yaz"
+          }
+        }
+      }
+    },
+    "${applicationName} expense": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} harcama"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

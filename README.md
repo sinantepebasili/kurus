@@ -1,6 +1,15 @@
-# Kuruş
+# Kuruş / Cent
 
 Sunucusuz, hesapsız, saf SwiftUI harcama takip uygulaması. iOS 17.0+ · iPhone · Swift 5 dil modu · 3. parti bağımlılık yok.
+
+## Dil, marka ve para birimi
+
+- **Marka:** Cihaz dili Türkçe ise uygulamanın adı **Kuruş**, diğer tüm dillerde **Cent**. Bu ad sol üst başlıkta, otomasyon rehberinde, PDF/CSV'de ve widget'larda kullanılıyor (`AppLanguage.brandName`). Ana ekrandaki ad `InfoPlist.xcstrings` ile yerelleştirildi: `en` → Cent, `tr` → Kuruş.
+- **Arayüz metinleri:** `Shared/Localization.swift` içindeki `L("Türkçe", "English")` ile seçiliyor; Türkçe cihazda ilk, diğer dillerde ikinci metin gösteriliyor.
+- **Siri ve widget metinleri:** Siri/Kestirmeler ve widget galerisi gibi sistemin okuduğu sabit metinler `Shared/Localizable.xcstrings` ve `App/AppShortcuts.xcstrings` kataloglarında (kaynak dil `en`, çeviri `tr`). Projenin geliştirme dili `en`; Türkçe ve İngilizce dışındaki dillerde arayüz İngilizce açılır.
+- **Para birimi:** Cihaz bölgesinden okunuyor (`Locale.current.currency`): TR → ₺, US → $, Euro bölgesi → €, GB → £. Binlik ve ondalık ayırıcılar ile sembolün önde mi sonda mı olduğu da yerel ayardan geliyor (`₺1.250,50`, `$1,250.50`, `1.250,50 €`).
+- **Yabancı para birimi:** Metinde açıkça başka bir para birimi geçen kayıt (`$14.50` ama cihaz TR) kendi sembolüyle saklanır ve listelenir. Kur çevrimi yapılmadığı için toplamlara, bütçeye ve kategori analizine dahil edilmez.
+- **Ayrıştırıcı iki dili de okur:** `642,50` / `642.50` / `1.250,00` / `1,250.00` · `3t` / `3x` / `üç taksit` / `in four installments` · `dün` / `yesterday` · `+Maaş` / `+Salary` / `Refund +120` · Türk banka SMS'leri ve `Card ending in 4532 at Whole Foods for $84.50` gibi İngilizce bildirimler.
 
 ## Hızlı başlangıç
 
@@ -25,10 +34,14 @@ Kurus/
 │   ├── BrandLogoView.swift           Marka işareti, sol üst başlık, ikon dışa aktarıcısı
 │   ├── CategoryBreakdownSheet.swift  % rozetinden açılan halka grafik analizi
 │   ├── Assets.xcassets               AppIcon, AccentColor, LaunchBackground
+│   ├── InfoPlist.xcstrings           Görünen ad: en "Cent" / tr "Kuruş"
+│   ├── AppShortcuts.xcstrings        Siri ifadelerinin Türkçesi
 │   ├── Info.plist                    kurus:// URL şeması, karanlık açılış ekranı
 │   ├── Kurus.entitlements            App Group + iCloud KVS
 │   └── PrivacyInfo.xcprivacy         UserDefaults gerekçe beyanı
 ├── Shared/                           HER İKİ target'a da dahil
+│   ├── Localization.swift            Dil/marka (Kuruş·Cent), L(tr, en), yerel para biçimi, örnekler
+│   ├── Localizable.xcstrings         Intent ve widget galerisi metinleri (en → tr)
 │   ├── Theme.swift
 │   ├── BrandEngine.swift
 │   ├── ExpenseModel.swift
@@ -38,6 +51,7 @@ Kurus/
 └── Widget/                           Yalnızca "KurusWidgetExtension" target'ı
     ├── KurusWidget.swift             @main — WidgetBundle (4 widget)
     ├── Assets.xcassets               AccentColor, WidgetBackground
+    ├── InfoPlist.xcstrings           Görünen ad: en "Cent" / tr "Kuruş"
     ├── Info.plist                    NSExtension = com.apple.widgetkit-extension
     ├── KurusWidget.entitlements      App Group + iCloud KVS
     └── PrivacyInfo.xcprivacy
@@ -114,12 +128,13 @@ Otomatik imzalama (*Automatically manage signing*) açıkken Xcode aşağıdakil
 - **Uygulama:** `Kurus` şeması. İlk açılışta canlı demo (“Netflix 229”, “Turkcell 450”) otomatik oynar.
 - **Widget:** `KurusWidgetExtension` şeması widget'ı simülatörde açar (varsayılan `systemMedium`). Ya da uygulamayı kurup ana ekrana widget ekleyin.
 - **Deep link:** Simülatörde `xcrun simctl openurl booted kurus://quick-add` giriş çubuğunu odaklar.
-- **Siri / Kestirmeler:** “Kuruş ile harcama ekle”. SMS otomasyonu kurulumu uygulama içindeki *Banka SMS Otomasyonu Rehberi*'nde anlatılıyor.
+- **Siri / Kestirmeler:** “Kuruş ile harcama ekle” / “Log an expense in Cent”. Otomasyon kurulumu uygulama içindeki rehberde anlatılıyor: Türkçede banka SMS’i, İngilizcede Apple Pay (*Transaction*) ve banka SMS’i.
+- **Dili denemek:** Scheme › Run › Options › *App Language* ve *App Region* (ör. English / United States) ile uygulama Cent, `$` ve `1,250.50` biçimiyle açılır.
 - **iCloud eşitlemesi:** Simülatörde iCloud hesabıyla oturum açın. KVS eşitlemesi gecikmeli olabilir; en güvenilir test iki gerçek cihazla yapılır.
 
 ## Kullanım notları
 
-- **Gelir:** Giriş çubuğuna başında `+` ile (`+Maaş 65000`, `İade +450`) ya da *maaş, gelir, iade, prim, ikramiye, kira geliri* kelimeleriyle yazın.
+- **Gelir:** Giriş çubuğuna başında `+` ile (`+Maaş 65000`, `İade +450`, `+Salary 5000`, `Refund +120`) ya da *maaş, gelir, iade, prim, ikramiye, kira geliri / salary, income, refund, paycheck* kelimeleriyle yazın.
   - Gelir zümrüt yeşili `+₺` olarak listelenir ve harcama toplamına eklenmez.
   - O ay gelir varsa özet kartındaki limit (`/ ₺…`) o ayın toplam geliri olur; yoksa manuel bütçe gösterilir.
   - `Disney+ 349` gibi harfe yapışık `+` gelir sayılmaz.
