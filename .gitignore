@@ -1,10 +1,59 @@
-# Xcode
+# ── Xcode: kullanıcıya özel durum ─────────────────────────────
 xcuserdata/
 *.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+*.moved-aside
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.pbxuser
+!default.pbxuser
+!default.mode1v3
+!default.mode2v3
+!default.perspectivev3
+
+# ── Xcode: derleme çıktıları ──────────────────────────────────
 DerivedData/
 build/
+Build/
+*.hmap
 *.ipa
-*.dSYM.zip
 *.dSYM
-# macOS
+*.dSYM.zip
+*.xcarchive
+*.xcresult
+timeline.xctimeline
+playground.xcworkspace
+
+# ── Swift Package Manager ─────────────────────────────────────
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+
+# ── fastlane / test çıktıları ────────────────────────────────
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# ── macOS ─────────────────────────────────────────────────────
 .DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+
+# ── Editörler ─────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*~
