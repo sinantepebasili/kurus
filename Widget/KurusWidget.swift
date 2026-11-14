@@ -25,6 +25,8 @@ struct KurusEntry: TimelineEntry {
     let budget: Decimal
     let savingsShare: Double
     let week: [DayTotal]
+    /// App Group'taki Pro durumu (StoreManager yazar). Kilitli önizleme için.
+    var isPro: Bool = true
 
     var budgetProgress: Double {
         budget > 0 ? (monthTotal / budget).doubleValue : 0
@@ -38,7 +40,8 @@ struct KurusEntry: TimelineEntry {
             todayTotal: Ledger.spendingOnDay(snapshot.expenses, day: date),
             budget: Ledger.effectiveBudget(month, manual: snapshot.monthlyBudget),
             savingsShare: Ledger.savingsShare(month),
-            week: Ledger.dailyTotals(snapshot.expenses, days: 7, endingAt: date)
+            week: Ledger.dailyTotals(snapshot.expenses, days: 7, endingAt: date),
+            isPro: ProStatus.isPro
         )
     }
 
@@ -116,14 +119,51 @@ struct QuickAddWidgetView: View {
 
             Spacer(minLength: 8)
 
+            if entry.isPro {
+                HStack(spacing: 8) {
+                    ForEach(QuickSamples.all) { preset in
+                        Button(intent: AddExpenseIntent(text: preset.command)) {
+                            presetChip(preset)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            } else {
+                lockedPresets
+            }
+        }
+        // Ücretsiz planda widget'a dokunmak Pro sayfasını açar (kurus://pro)
+        .widgetURL(entry.isPro ? nil : URL(string: "kurus://pro"))
+    }
+
+    /// Pro değilse: çipler soluk önizleme, üstünde sakin bir kilit hapı. Butonlar (intent) hiç çizilmez.
+    private var lockedPresets: some View {
+        ZStack {
             HStack(spacing: 8) {
                 ForEach(QuickSamples.all) { preset in
-                    Button(intent: AddExpenseIntent(text: preset.command)) {
-                        presetChip(preset)
-                    }
-                    .buttonStyle(.plain)
+                    presetChip(preset)
                 }
             }
+            .blur(radius: 2.5)
+            .opacity(0.4)
+            .accessibilityHidden(true)
+
+            HStack(spacing: 6) {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 10, weight: .bold))
+                Text(L(
+                    "Tek dokunuşla ekleme · \(AppLanguage.brandName) Pro",
+                    "One-tap logging · \(AppLanguage.brandName) Pro"
+                ))
+                .font(.system(size: 12, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            }
+            .foregroundStyle(Theme.textPrimary)
+            .padding(.horizontal, 12)
+            .frame(height: 28)
+            .background(Theme.elevated, in: Capsule())
+            .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
         }
     }
 

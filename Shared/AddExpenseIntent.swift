@@ -37,6 +37,11 @@ struct AddExpenseIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog & ShowsSnippetView {
+        // Kestirmeler, Siri, SMS / Apple Pay otomasyonu ve interaktif widget Pro özelliğidir.
+        // Pro durumu App Group'tan okunur (StoreManager uygulamada doğrular ve yazar).
+        guard ProStatus.isPro else {
+            throw KurusIntentError.proRequired
+        }
         guard let parsed = ExpenseParser.parse(text), parsed.isValid else {
             throw KurusIntentError.amountNotFound
         }
@@ -77,6 +82,7 @@ struct AddExpenseIntent: AppIntent {
 
 enum KurusIntentError: Error, CustomLocalizedStringResourceConvertible {
     case amountNotFound
+    case proRequired
 
     var localizedStringResource: LocalizedStringResource {
         switch self {
@@ -84,6 +90,11 @@ enum KurusIntentError: Error, CustomLocalizedStringResourceConvertible {
             LocalizedStringResource(stringLiteral: L(
                 "Metinde bir tutar bulamadım. “Kahve 145” gibi yazmayı dene.",
                 "I couldn’t find an amount. Try something like “Coffee 5”."
+            ))
+        case .proRequired:
+            LocalizedStringResource(stringLiteral: L(
+                "Kestirmeler ve SMS otomasyonu \(AppLanguage.brandName) Pro ile çalışır. Uygulamayı açıp menüden Pro’ya geçebilirsin.",
+                "Shortcuts and SMS automation are part of \(AppLanguage.brandName) Pro. Open the app and upgrade from the menu."
             ))
         }
     }

@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(SharedExpenseStore.self) private var store
+    @Environment(StoreManager.self) private var storeManager
     @Environment(\.scenePhase) private var scenePhase
 
     @AppStorage("kurus.privacyMode") private var isPrivate = false
@@ -20,6 +21,8 @@ struct ContentView: View {
 
     @State private var showGuide = false
     @State private var categoryTarget: Expense?
+    /// Pro kilidine takılan özellik → PaywallView (ilgili satır vurgulu)
+    @State private var paywallFeature: ProFeature?
 
     @State private var toast: UndoToastState?
     @State private var toastTask: Task<Void, Never>?
@@ -65,7 +68,12 @@ struct ContentView: View {
                 header
                     .plainRow(EdgeInsets(top: 8, leading: Theme.gutter, bottom: 6, trailing: Theme.gutter))
 
-                SummaryCardView(filter: $filter, isPrivate: $isPrivate, month: $selectedMonth)
+                SummaryCardView(
+                    filter: $filter,
+                    isPrivate: $isPrivate,
+                    month: $selectedMonth,
+                    onRequirePro: { paywallFeature = $0 }
+                )
                     .plainRow(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
 
                 if showsDemoBanner {
@@ -132,13 +140,19 @@ struct ContentView: View {
             SmartInputBarView(
                 text: $inputText,
                 isFocused: $inputFocused,
-                isDemoTyping: isDemoTyping
+                isDemoTyping: isDemoTyping,
+                lockedFeature: lockedFeature(for:)
             ) { parsed in
                 commit(parsed, isDemo: false)
             }
         }
         .sheet(isPresented: $showGuide) {
             AutomationGuideSheet()
+                .environment(storeManager)
+        }
+        .sheet(item: $paywallFeature) { feature in
+            PaywallView(feature: feature)
+                .environment(storeManager)
         }
         .sheet(item: $categoryTarget) { expense in
             CategoryPickerSheet(expense: expense) { category in
@@ -149,7 +163,10 @@ struct ContentView: View {
         }
         .onAppear(perform: startDemoIfNeeded)
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { store.reloadFromDisk() }
+            if phase == .active {
+                store.reloadFromDisk()
+                Task { await storeManager.refreshEntitlements() }
+            }
         }
         .onChange(of: inputFocused) { _, focused in
             // Kullanıcı demo sürerken yazmaya başlarsa demo anında çekilir.
@@ -182,6 +199,15 @@ struct ContentView: View {
             .accessibilityLabel(isPrivate ? L("Tutarları göster", "Show amounts") : L("Tutarları gizle", "Hide amounts"))
 
             Menu {
+                if !storeManager.isPro {
+                    Button {
+                        paywallFeature = .general
+                    } label: {
+                        Label("\(AppLanguage.brandName) Pro", systemImage: "sparkles")
+                    }
+                    Divider()
+                }
+
                 Button {
                     showGuide = true
                 } label: {
@@ -190,31 +216,45 @@ struct ContentView: View {
 
                 Divider()
 
-                ShareLink(
-                    item: PDFExport(
-                        month: selectedMonth,
-                        expenses: Ledger.inMonth(store.expenses, of: selectedMonth),
-                        cards: store.cards,
-                        budget: Ledger.effectiveBudget(
-                            Ledger.inMonth(store.expenses, of: selectedMonth),
-                            manual: store.monthlyBudget
+                if storeManager.isPro {
+                    ShareLink(
+                        item: PDFExport(
+                            month: selectedMonth,
+                            expenses: Ledger.inMonth(store.expenses, of: selectedMonth),
+                            cards: store.cards,
+                            budget: Ledger.effectiveBudget(
+                                Ledger.inMonth(store.expenses, of: selectedMonth),
+                                manual: store.monthlyBudget
+                            ),
+                            fileName: "\(ExportManager.fileStem(for: selectedMonth))-\(L("Ekstre", "Statement")).pdf"
                         ),
-                        fileName: "\(ExportManager.fileStem(for: selectedMonth))-\(L("Ekstre", "Statement")).pdf"
-                    ),
-                    preview: SharePreview(L("\(AppLanguage.brandName) Ekstresi", "\(AppLanguage.brandName) Statement"), image: Image(systemName: "doc.richtext"))
-                ) {
-                    Label(L("Ekstre Oluştur (PDF)", "Create Statement (PDF)"), systemImage: "doc.richtext")
-                }
+                        preview: SharePreview(L("\(AppLanguage.brandName) Ekstresi", "\(AppLanguage.brandName) Statement"), image: Image(systemName: "doc.richtext"))
+                    ) {
+                        Label(L("Ekstre Oluştur (PDF)", "Create Statement (PDF)"), systemImage: "doc.richtext")
+                    }
 
-                ShareLink(
-                    item: CSVExport(
-                        expenses: store.expenses,
-                        cards: store.cards,
-                        fileName: "\(ExportManager.fileStem()).csv"
-                    ),
-                    preview: SharePreview(L("\(AppLanguage.brandName) Harcamaları", "\(AppLanguage.brandName) Expenses"), image: Image(systemName: "tablecells"))
-                ) {
-                    Label(L("Excel / CSV Paylaş", "Share Excel / CSV"), systemImage: "tablecells")
+                    ShareLink(
+                        item: CSVExport(
+                            expenses: store.expenses,
+                            cards: store.cards,
+                            fileName: "\(ExportManager.fileStem()).csv"
+                        ),
+                        preview: SharePreview(L("\(AppLanguage.brandName) Harcamaları", "\(AppLanguage.brandName) Expenses"), image: Image(systemName: "tablecells"))
+                    ) {
+                        Label(L("Excel / CSV Paylaş", "Share Excel / CSV"), systemImage: "tablecells")
+                    }
+                } else {
+                    // Ücretsiz planda dışa aktarma Pro sayfasını açar
+                    Button {
+                        paywallFeature = .export
+                    } label: {
+                        Label(L("Ekstre Oluştur (PDF)", "Create Statement (PDF)"), systemImage: "lock.fill")
+                    }
+                    Button {
+                        paywallFeature = .export
+                    } label: {
+                        Label(L("Excel / CSV Paylaş", "Share Excel / CSV"), systemImage: "lock.fill")
+                    }
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
@@ -317,7 +357,26 @@ struct ContentView: View {
 
     // MARK: - Eylemler
 
+    /// Ücretsiz planda bu giriş bir Pro özelliğine mi takılıyor?
+    /// Taksit ("3t", "6 taksit") ya da ikinci bir kart → Pro. Yazı/dikte girişi her zaman serbest.
+    private func lockedFeature(for parsed: ParsedExpense) -> ProFeature? {
+        guard !storeManager.isPro else { return nil }
+        if parsed.installmentCount > 1 { return .installments }
+        if store.cards.count >= ProStatus.freeCardLimit, store.wouldCreateCard(for: parsed) {
+            return .multipleCards
+        }
+        return nil
+    }
+
     private func commit(_ parsed: ParsedExpense, isDemo: Bool) {
+        // Kilitli özellik: metin kutuda kalır, yükseltince tek Return ile kaydedilir.
+        if !isDemo, let feature = lockedFeature(for: parsed) {
+            Haptics.warning()
+            inputFocused = false
+            paywallFeature = feature
+            return
+        }
+
         let created = withAnimation(Theme.spring) {
             store.add(parsed, isDemo: isDemo)
         }
@@ -382,6 +441,11 @@ struct ContentView: View {
 
     private func handle(_ url: URL) {
         guard url.scheme == "kurus" else { return }
+        if url.host == "pro" {
+            // Kilitli widget'tan gelindi
+            if !storeManager.isPro { paywallFeature = .widgets }
+            return
+        }
         if url.host == "quick-add" {
             if isDemoTyping || store.expenses.contains(where: { $0.isDemo }) { clearAndStart() }
             Task { @MainActor in

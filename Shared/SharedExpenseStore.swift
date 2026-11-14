@@ -58,6 +58,14 @@ final class SharedExpenseStore {
         snapshot.cards.first { $0.id == id }
     }
 
+    /// Bu kayıt yeni bir kart oluşturur mu? (Ücretsiz planın kart sınırı için; veri değişmez.)
+    func wouldCreateCard(for parsed: ParsedExpense) -> Bool {
+        var probe = snapshot
+        let before = probe.cards.count
+        _ = Self.resolveCard(for: parsed, in: &probe)
+        return probe.cards.count > before
+    }
+
     // MARK: - Yazma işlemleri
 
     /// Ayrıştırılmış metni kaydeder. Taksitliyse her ay için bir kayıt üretir (1/3, 2/3, 3/3).

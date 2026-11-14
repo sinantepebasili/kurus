@@ -11,6 +11,8 @@ import SwiftUI
 struct AutomationGuideSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
+    @Environment(StoreManager.self) private var storeManager
+    @State private var showPaywall = false
 
     private var brand: String { AppLanguage.brandName }
 
@@ -42,10 +44,16 @@ struct AutomationGuideSheet: View {
                     privacyNote
 
                     Button {
-                        if let url = URL(string: "shortcuts://") { openURL(url) }
+                        // SMS / Apple Pay otomasyonu Pro: ücretsiz planda önce Pro sayfası açılır
+                        if storeManager.isPro {
+                            if let url = URL(string: "shortcuts://") { openURL(url) }
+                        } else {
+                            Haptics.selection()
+                            showPaywall = true
+                        }
                     } label: {
                         HStack(spacing: 8) {
-                            Image(systemName: "arrow.up.forward.app.fill")
+                            Image(systemName: storeManager.isPro ? "arrow.up.forward.app.fill" : "lock.fill")
                             Text(L("Kestirmeler’i Aç", "Open Shortcuts"))
                         }
                         .font(.system(size: 17, weight: .semibold))
@@ -72,6 +80,10 @@ struct AutomationGuideSheet: View {
                         .foregroundStyle(Theme.emerald)
                 }
             }
+        }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView(feature: .smsAutomation)
+                .environment(storeManager)
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)

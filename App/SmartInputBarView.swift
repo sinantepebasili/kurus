@@ -11,6 +11,8 @@ struct SmartInputBarView: View {
     @Binding var text: String
     var isFocused: FocusState<Bool>.Binding
     var isDemoTyping: Bool = false
+    /// Ücretsiz planda bu giriş bir Pro özelliğine takılıyorsa (taksit, ikinci kart) — hapta kilit gösterilir
+    var lockedFeature: (ParsedExpense) -> ProFeature? = { _ in nil }
     var onSubmit: (ParsedExpense) -> Void
 
     @State private var shakes: CGFloat = 0
@@ -21,7 +23,7 @@ struct SmartInputBarView: View {
 
         VStack(spacing: 10) {
             if let parsed {
-                LiveParsePill(parsed: parsed)
+                LiveParsePill(parsed: parsed, locked: lockedFeature(parsed))
                     .padding(.horizontal, Theme.gutter)
                     .transition(
                         .asymmetric(
@@ -116,6 +118,8 @@ struct SmartInputBarView: View {
 
 struct LiveParsePill: View {
     let parsed: ParsedExpense
+    /// Pro kilidi: ilgili etiket kilit simgesiyle gösterilir, Return'de Pro sayfası açılır
+    var locked: ProFeature? = nil
 
     var body: some View {
         HStack(spacing: 10) {
@@ -154,13 +158,21 @@ struct LiveParsePill: View {
         HStack(spacing: 5) {
             ParseTag(symbol: parsed.category.symbol, text: compact ? nil : parsed.category.title, tint: parsed.category.color)
             if parsed.installmentCount > 1 {
-                ParseTag(symbol: "square.stack.3d.up.fill", text: L("\(parsed.installmentCount) taksit", "\(parsed.installmentCount)x"), tint: Theme.amber)
+                ParseTag(
+                    symbol: locked == .installments ? "lock.fill" : "square.stack.3d.up.fill",
+                    text: L("\(parsed.installmentCount) taksit", "\(parsed.installmentCount)x") + (locked == .installments ? " · Pro" : ""),
+                    tint: Theme.amber
+                )
             }
             if parsed.dayOffset == -1 {
                 ParseTag(symbol: "calendar", text: compact ? nil : L("Dün", "Yesterday"), tint: Theme.textSecondary)
             }
             if let card = compact ? parsed.compactCardLabel : parsed.cardLabel {
-                ParseTag(symbol: parsed.isCash ? "banknote.fill" : "creditcard.fill", text: card, tint: Theme.ocean)
+                ParseTag(
+                    symbol: locked == .multipleCards ? "lock.fill" : (parsed.isCash ? "banknote.fill" : "creditcard.fill"),
+                    text: card + (locked == .multipleCards ? " · Pro" : ""),
+                    tint: Theme.ocean
+                )
             }
             if parsed.isRecurring {
                 ParseTag(symbol: "repeat", text: compact ? nil : (parsed.isIncome ? L("Aylık", "Monthly") : L("Abonelik", "Subscription")), tint: Theme.violet)

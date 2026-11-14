@@ -1,0 +1,97 @@
+{
+  "identifier": "8C1B5E2A",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "19.99",
+      "familyShareable": false,
+      "internalID": "6740000003",
+      "localizations": [
+        {
+          "description": "All Pro features, one-time purchase.",
+          "displayName": "Pro Lifetime",
+          "locale": "en_US"
+        },
+        {
+          "description": "Tüm Pro özellikleri, tek seferlik.",
+          "displayName": "Pro Ömür Boyu",
+          "locale": "tr"
+        }
+      ],
+      "productID": "com.kurus.app.pro.lifetime",
+      "referenceName": "Pro Lifetime",
+      "type": "NonConsumable"
+    }
+  ],
+  "settings": {
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [
+    {
+      "id": "21500001",
+      "localizations": [],
+      "name": "Pro",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "14.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "6740000002",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "All Pro features, billed yearly.",
+              "displayName": "Pro Yearly",
+              "locale": "en_US"
+            },
+            {
+              "description": "Tüm Pro özellikleri, yıllık.",
+              "displayName": "Pro Yıllık",
+              "locale": "tr"
+            }
+          ],
+          "productID": "com.kurus.app.pro.yearly",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Pro Yearly",
+          "subscriptionGroupID": "21500001",
+          "type": "RecurringSubscription"
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "2.99",
+          "familyShareable": false,
+          "groupNumber": 2,
+          "internalID": "6740000001",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "All Pro features, billed monthly.",
+              "displayName": "Pro Monthly",
+              "locale": "en_US"
+            },
+            {
+              "description": "Tüm Pro özellikleri, aylık.",
+              "displayName": "Pro Aylık",
+              "locale": "tr"
+            }
+          ],
+          "productID": "com.kurus.app.pro.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Pro Monthly",
+          "subscriptionGroupID": "21500001",
+          "type": "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version": {
+    "major": 3,
+    "minor": 0
+  }
+}

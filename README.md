@@ -11,6 +11,46 @@ Sunucusuz, hesapsız, saf SwiftUI harcama takip uygulaması. iOS 17.0+ · iPhone
 - **Yabancı para birimi:** Metinde açıkça başka bir para birimi geçen kayıt (`$14.50` ama cihaz TR) kendi sembolüyle saklanır ve listelenir. Kur çevrimi yapılmadığı için toplamlara, bütçeye ve kategori analizine dahil edilmez.
 - **Ayrıştırıcı iki dili de okur:** `642,50` / `642.50` / `1.250,00` / `1,250.00` · `3t` / `3x` / `üç taksit` / `in four installments` · `dün` / `yesterday` · `+Maaş` / `+Salary` / `Refund +120` · Türk banka SMS'leri ve `Card ending in 4532 at Whole Foods for $84.50` gibi İngilizce bildirimler.
 
+## Free ve Pro (StoreKit 2)
+
+Satın alma Apple'ın yerel **StoreKit 2** çerçevesiyle yapılır; 3. parti kütüphane yoktur.
+
+| Ücretsiz | Pro |
+|---|---|
+| Sınırsız yazı ve sesli dikte girişi | Banka SMS / Apple Pay otomasyonu, Kestirmeler ve Siri (`AddExpenseIntent`) |
+| iCloud yedekleme, gizlilik bulanıklığı, marka rozetleri | Taksit bölme (`3t`, `6 taksit`, `3x`) ve sınırsız kart (ücretsizde 1 kart + nakit) |
+| İçinde bulunulan ayın özeti ve halka grafik analizi | Geçmiş aylar arşivi ve gelecek ay yükü (`‹ ›` okları) |
+| Kilit Ekranı widget'ları ve 7 günlük widget | PDF / Excel (CSV) dışa aktarma ve interaktif Hızlı Ekle widget'ı |
+
+**Ürün kimlikleri:**
+
+| Plan | Product ID | Tür | Yedek fiyat (TR / EN) |
+|---|---|---|---|
+| Aylık | `com.kurus.app.pro.monthly` | Otomatik yenilenen abonelik (P1M) | ₺79,99 / $2.99 |
+| Yıllık | `com.kurus.app.pro.yearly` | Otomatik yenilenen abonelik (P1Y) | ₺349,99 / $14.99 |
+| Ömür Boyu | `com.kurus.app.pro.lifetime` | Tüketilmeyen (non-consumable) | ₺499,99 / $19.99 |
+
+**Nasıl çalışır:**
+- **`App/StoreManager.swift`:**
+  - Açılışta `Transaction.currentEntitlements` ile hakkı doğrular ve `Transaction.updates`'i arka planda dinler.
+  - `restorePurchases()` ile `AppStore.sync()` çağırır.
+  - Sonucu App Group'a `isProUser` olarak yazar (`Shared/ProStatus.swift`); widget ve Kestirmeler bu bayrağı okur.
+- **Yedek fiyatlar:** Gerçek fiyatlar `Product.displayPrice`'tan gelir. Yedek fiyatlar yalnızca ürünler yüklenemezse gösterilir.
+- **`App/PaywallView.swift`:** Varsayılan plan Ömür Boyu. En altta Geri Yükle, [Kullanım Koşulları](https://www.apple.com/legal/internet-services/itunes/dev/stdeula/) (Apple standart EULA) ve [Gizlilik Politikası](PRIVACY.md) bağlantıları var.
+
+**App Store Connect'te elle yapılacaklar:**
+1. *Business › Agreements* altında **Paid Applications** sözleşmesini imzalayın; banka ve vergi bilgilerini doldurun. Bu adım tamamlanmadan ürünler yüklenmez.
+2. *Uygulamanız › Subscriptions* altında bir abonelik grubu (ör. "Pro") oluşturun. Yıllık ve aylık abonelikleri yukarıdaki kimliklerle ekleyin; yıllığı daha üst seviye yapın.
+3. *In-App Purchases* altında Ömür Boyu'nu **Non-Consumable** olarak ekleyin.
+4. Her ürüne fiyat, en az bir yerelleştirme (tr ve en) ve inceleme ekran görüntüsü ekleyin. İlk ürünler uygulama sürümüyle birlikte incelemeye gönderilmelidir.
+5. *App Privacy* bölümüne Gizlilik Politikası URL'si olarak `PRIVACY.md` bağlantısını girin. Uygulama veri toplamadığı için "Data Not Collected" seçeneği uygundur.
+6. Bundle ID değişirse ürün kimliklerini `StoreManager.Plan.productID` ve `Kurus.storekit` içinde de güncelleyin.
+
+**Yerelde deneme (App Store Connect olmadan):**
+- **StoreKit yapılandırması:** Scheme › Run › Options › **StoreKit Configuration** alanından proje kökündeki `Kurus.storekit` dosyasını seçin. Bu dosya üç ürünü USD fiyatlarıyla tanımlar; Türk mağazası için *Editor › Default Storefront* kullanılabilir.
+- **İşlem yönetimi:** Satın almaları *Debug › StoreKit › Manage Transactions* penceresinden iade edebilir veya silebilirsiniz.
+- **Doğrulama durumu:** `Kurus.storekit` elle yazıldı ve yalnızca JSON olarak doğrulandı. Xcode açmazsa *File › New › File › StoreKit Configuration File* ile yeniden oluşturup aynı üç ürünü ekleyin.
+
 ## Hızlı başlangıç
 
 1. `Kurus.xcodeproj` dosyasını **Xcode 15 veya üstü** ile açın.

@@ -11,11 +11,14 @@ import SwiftUI
 struct SummaryCardView: View {
     @Environment(SharedExpenseStore.self) private var store
     @Environment(\.privacyMode) private var privacyMode
+    @Environment(StoreManager.self) private var storeManager
 
     @Binding var filter: CardFilter
     @Binding var isPrivate: Bool
     /// Görüntülenen ayın ilk günü (`Ledger.startOfMonth`).
     @Binding var month: Date
+    /// Ücretsiz planda geçmiş/gelecek aylara geçiş Pro sayfasını açar
+    var onRequirePro: (ProFeature) -> Void = { _ in }
 
     @State private var isEditingBudget = false
     @State private var budgetDraft = ""
@@ -146,7 +149,7 @@ struct SummaryCardView: View {
 
     private var monthStepper: some View {
         HStack(spacing: 6) {
-            stepButton("chevron.left", enabled: canGoBack, label: L("Önceki ay", "Previous month")) { shiftMonth(by: -1) }
+            stepButton("chevron.left", enabled: !storeManager.isPro || canGoBack, label: L("Önceki ay", "Previous month")) { shiftMonth(by: -1) }
 
             Button {
                 guard !isCurrentMonth else { return }
@@ -164,7 +167,7 @@ struct SummaryCardView: View {
             .buttonStyle(.plain)
             .accessibilityHint(isCurrentMonth ? "" : L("Bu aya dönmek için dokun", "Tap to return to this month"))
 
-            stepButton("chevron.right", enabled: canGoForward, label: L("Sonraki ay", "Next month")) { shiftMonth(by: 1) }
+            stepButton("chevron.right", enabled: !storeManager.isPro || canGoForward, label: L("Sonraki ay", "Next month")) { shiftMonth(by: 1) }
         }
     }
 
@@ -186,6 +189,12 @@ struct SummaryCardView: View {
     }
 
     private func shiftMonth(by delta: Int) {
+        // Geçmiş aylar arşivi ve gelecek ay yükü Pro; ücretsiz planda içinde bulunulan ay serbest.
+        guard storeManager.isPro else {
+            Haptics.selection()
+            onRequirePro(.monthHistory)
+            return
+        }
         guard let target = Ledger.calendar.date(byAdding: .month, value: delta, to: month) else { return }
         if isEditingBudget { commitBudget() }
         withAnimation(Theme.spring) { month = Ledger.startOfMonth(target) }

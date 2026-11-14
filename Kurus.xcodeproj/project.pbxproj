@@ -19,6 +19,10 @@
 			isa = PBXBuildFile;
 			fileRef = A53046FE1844806311F2D784;
 		};
+		245EBDA653D6C43BA9ABEFC7 /* StoreManager.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = E5A54F41E88FA99795F63D9C;
+		};
 		359E21854C1437F63AD12954 /* Localizable.xcstrings in Resources */ = {
 			isa = PBXBuildFile;
 			fileRef = A53046FE1844806311F2D784;
@@ -115,6 +119,10 @@
 			isa = PBXBuildFile;
 			fileRef = 0365672E26E54D87A9D1F001;
 		};
+		B0DE71084610286273EEC49B /* ProStatus.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = 2A0A7DC07F9232F9DFDF3F44;
+		};
 		BC73C601EF8E9205977AE2D0 /* WidgetKit in Frameworks */ = {
 			isa = PBXBuildFile;
 			fileRef = 20CB2BFD4A1989C48DA1B5D4;
@@ -147,6 +155,14 @@
 		E6CE0D9B539340CED45C9F6A /* ExpenseModel.swift in Sources */ = {
 			isa = PBXBuildFile;
 			fileRef = 597256962D1320E988664EA7;
+		};
+		E7DADCCB74E2D8BA8FB2C3C7 /* ProStatus.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = 2A0A7DC07F9232F9DFDF3F44;
+		};
+		EBFD0EB432592E9A8B043553 /* PaywallView.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = 0E7FD68C11E4734E6719D1FB;
 		};
 		F66173476F021599F1425643 /* ExpenseModel.swift in Sources */ = {
 			isa = PBXBuildFile;
@@ -185,6 +201,12 @@
 			path = PrivacyInfo.xcprivacy;
 			sourceTree = "<group>";
 		};
+		0E7FD68C11E4734E6719D1FB /* PaywallView.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = PaywallView.swift;
+			sourceTree = "<group>";
+		};
 		18297A60B9E3FA7FC1BD99F1 /* Assets.xcassets */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = folder.assetcatalog;
@@ -210,10 +232,22 @@
 			path = System/Library/Frameworks/WidgetKit.framework;
 			sourceTree = SDKROOT;
 		};
+		22A2E8D11812F019C91D3E96 /* Kurus.storekit */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = text;
+			path = Kurus.storekit;
+			sourceTree = "<group>";
+		};
 		23DA6D7374CE0CA94A81109A /* PrivacyInfo.xcprivacy */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = text.xml;
 			path = PrivacyInfo.xcprivacy;
+			sourceTree = "<group>";
+		};
+		2A0A7DC07F9232F9DFDF3F44 /* ProStatus.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = ProStatus.swift;
 			sourceTree = "<group>";
 		};
 		4EC1FF35F8179A094C3AB745 /* Theme.swift */ = {
@@ -326,6 +360,12 @@
 			path = SummaryCardView.swift;
 			sourceTree = "<group>";
 		};
+		B5AF71841A82B67EF82EB629 /* PRIVACY.md */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = net.daringfireball.markdown;
+			path = PRIVACY.md;
+			sourceTree = "<group>";
+		};
 		B644D499B755ABAD8014E968 /* KurusWidget.entitlements */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = text.plist.entitlements;
@@ -361,6 +401,12 @@
 			isa = PBXFileReference;
 			lastKnownFileType = text.plist.xml;
 			path = Info.plist;
+			sourceTree = "<group>";
+		};
+		E5A54F41E88FA99795F63D9C /* StoreManager.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = StoreManager.swift;
 			sourceTree = "<group>";
 		};
 		EB07A5392913A635EB512E4B /* KurusApp.swift */ = {
@@ -429,6 +475,8 @@
 			isa = PBXGroup;
 			children = (
 				8509DD790DE7D4A444D69168,
+				B5AF71841A82B67EF82EB629,
+				22A2E8D11812F019C91D3E96,
 				D1D0524B025E57AFFF263442,
 				B46A6AFB1DC88CE23F6E63F1,
 				206D9AE6A6433106E0AF6963,
@@ -441,6 +489,7 @@
 			isa = PBXGroup;
 			children = (
 				EF3D5C4E195956B127EFE63D,
+				2A0A7DC07F9232F9DFDF3F44,
 				4EC1FF35F8179A094C3AB745,
 				8630CC489063CBE3A06B0D78,
 				597256962D1320E988664EA7,
@@ -471,6 +520,8 @@
 				69858B467D368B7455633CB4,
 				A4230DB0AAFFA6A5F968B465,
 				BDB0FD55639C02365AEDFBBC,
+				E5A54F41E88FA99795F63D9C,
+				0E7FD68C11E4734E6719D1FB,
 				AE91E4A2F27199611E1133D6,
 				D59B301BE12A39FF7C501E5C,
 				53D7135E4646663BBC2E10DE,
@@ -592,6 +643,7 @@
 			files = (
 				75C1421399AE6983410BEA7A,
 				60CFF1C1184FEDA89F87D731,
+				E7DADCCB74E2D8BA8FB2C3C7,
 				933B8369F8FB07C539D8173A,
 				63EC8AB55282B3F1C898D7A1,
 				F66173476F021599F1425643,
@@ -612,8 +664,11 @@
 				D0B3D92509751094E64CAA59,
 				96E5C6DACAFC3CC9761EA9F3,
 				9FD66F03F7BD3D04981026B3,
+				245EBDA653D6C43BA9ABEFC7,
+				EBFD0EB432592E9A8B043553,
 				0DF714FA2CFF3303A8CF7BCE,
 				3E2D00AEE8B7781E7E437263,
+				B0DE71084610286273EEC49B,
 				8FA8BD6179AA39149CFDF039,
 				02B4B43DE33C307CD5FFD54B,
 				E6CE0D9B539340CED45C9F6A,
