@@ -11,7 +11,7 @@ import SwiftUI
 // MARK: - Kategori
 
 enum ExpenseCategory: String, Codable, CaseIterable, Identifiable, Sendable {
-    case food, coffee, market, transport, shopping, technology, housing, bills, subscription
+    case food, coffee, market, transport, shopping, technology, housing, bills, tax, subscription
     case entertainment, health, travel, education, savings, income, other
 
     var id: String { rawValue }
@@ -26,6 +26,7 @@ enum ExpenseCategory: String, Codable, CaseIterable, Identifiable, Sendable {
         case .technology: L("Teknoloji", "Tech")
         case .housing: L("Konut", "Housing")
         case .bills: L("Fatura", "Bills")
+        case .tax: L("Vergi & Resmi", "Tax & Government")
         case .subscription: L("Abonelik", "Subscriptions")
         case .entertainment: L("Eğlence", "Entertainment")
         case .health: L("Sağlık", "Health")
@@ -47,6 +48,7 @@ enum ExpenseCategory: String, Codable, CaseIterable, Identifiable, Sendable {
         case .technology: "desktopcomputer"
         case .housing: "house.fill"
         case .bills: "bolt.fill"
+        case .tax: "building.columns.fill"
         case .subscription: "repeat"
         case .entertainment: "popcorn.fill"
         case .health: "cross.case.fill"
@@ -66,6 +68,7 @@ enum ExpenseCategory: String, Codable, CaseIterable, Identifiable, Sendable {
         case .shopping, .entertainment, .health: Theme.coral
         case .subscription, .savings: Theme.violet
         case .technology: Theme.indigo
+        case .tax: Theme.brass
         case .income: Theme.emerald
         case .other: Theme.textSecondary
         }

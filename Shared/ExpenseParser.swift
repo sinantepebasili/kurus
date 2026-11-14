@@ -125,7 +125,9 @@ enum ExpenseParser {
         //     "Refund +120") ya da gelir kelimeleri. Harfe yapışık "+" ("Disney+ 349") gelir sayılmaz.
         let incomeBySign = raw.hasPrefix("+")
             || raw.range(of: #"(?<![\p{L}\p{N}])\+\s*[$€£₺]?\s*\d"#, options: .regularExpression) != nil
+        // "Gelir vergisi" / "Income tax" ödenen bir vergidir, gelir değil.
         let incomeByWord = SmartCategoryMatcher.matches(tokens: normTokens, keywords: Patterns.incomeWords)
+            && !SmartCategoryMatcher.matches(tokens: normTokens, keywords: Patterns.incomeExceptions)
         let isIncome = incomeBySign || incomeByWord
         if isIncome { result.installmentCount = 1 }
 
@@ -705,6 +707,9 @@ private enum Patterns {
     ]
     static let recurringIncomeWords = ["maas", "kira geliri", "salary", "paycheck", "payroll"]
 
+    /// Gelir kelimesi geçse de gider olanlar
+    static let incomeExceptions = ["gelir vergisi", "gelir idaresi", "income tax"]
+
     struct CategoryRule {
         let category: ExpenseCategory
         /// Doğal dilde yazılır; eşleştirmeden önce normalize edilir ("kulaklık" = "kulaklik").
@@ -720,28 +725,42 @@ private enum Patterns {
         // 0. ARAÇ KİRALAMA / BAKIMI (Konut'taki "rent", "kira", "maintenance"dan önce yakalanmalı)
         CategoryRule(category: .transport, keywords: [
             "araç kiralama", "rent a car", "car rental", "car maintenance", "araç bakımı",
+            "kasko", "trafik sigortası", "car insurance", "auto insurance",
         ]),
-        // 1. FATURA, ABONE HİZMETLERİ, VERGİ, SİGORTA — BILLS
-        //    (Konut'tan önce: "emlak vergisi", "kira faturası", "telefon faturası" burada kalır)
+        // 1. FATURA — yalnızca elektrik, su, doğalgaz, internet ve telefon — BILLS
         CategoryRule(category: .bills, keywords: [
             "fatura", "elektrik", "gediz", "enerjisa", "ck boğaziçi",
             "su faturası", "izsu", "iski", "aski", "doğalgaz", "igdaş", "izmirgaz", "başkentgaz",
             "internet", "fiber", "superonline", "turknet", "kablonet", "millenicom",
             "telekom", "hat faturası", "telefon faturası", "kontör",
-            "vergi", "mtv", "emlak vergisi", "harç", "noter", "sigorta", "kasko", "dask",
             // English
             "electricity", "electric bill", "water", "water bill",
-            "gas bill", "utility", "utilities", "wifi", "phone bill", "verizon", "tmobile", "t mobile",
-            "at&t", "att", "comcast", "xfinity", "insurance", "tax", "taxes",
+            "gas bill", "utility", "utilities", "wifi", "phone bill", "internet bill",
+            "verizon", "tmobile", "t mobile", "at&t", "att", "comcast", "xfinity",
+        ]),
+        // 1a. VERGİ & RESMİ ÖDEMELER — TAX & GOVERNMENT
+        //     Konut'tan önce: "emlak vergisi" Konut'taki "emlak"a düşmez.
+        //     "harç" yalnızca tam kelime: önek olsa "harcama"yı yakalardı.
+        CategoryRule(category: .tax, keywords: [
+            "vergi", "mtv", "motorlu taşıtlar vergisi", "emlak vergisi", "gelir vergisi", "kurumlar vergisi",
+            "damga vergisi", "kdv", "vergi dairesi", "gib", "trafik cezası", "ceza", "otopark cezası",
+            "noter", "harç!", "harcı!", "tapu", "pasaport harcı", "ehliyet", "nüfus", "e-devlet",
+            "sgk", "bağkur",
+            // English
+            "tax", "taxes", "income tax", "property tax", "council tax", "sales tax", "irs", "hmrc",
+            "dmv", "traffic fine", "parking fine", "speeding fine", "parking ticket", "speeding ticket",
+            "traffic ticket", "court fee", "notary", "passport fee", "visa fee", "drivers license",
+            "driver's license", "license renewal", "car registration", "vehicle registration", "toll fine",
         ]),
         // 1b. KONUT — KİRA, AİDAT, EV BAKIM / ONARIM — HOUSING
         //     "Kira 25000", "Aidat 1850", "Rent 1500", "HOA 300" artık Fatura sayılmaz.
         CategoryRule(category: .housing, keywords: [
             "kira", "ev kirası", "aidat", "site aidatı", "apartman aidatı", "site yönetimi", "depozito",
             "emlak", "emlakçı", "kombi", "petek", "tesisat", "tadilat", "çilingir", "nakliye", "boya badana",
+            "dask", "konut sigortası",
             // English
             "rent", "mortgage", "hoa", "maintenance", "landlord", "security deposit", "property management",
-            "plumber", "locksmith", "movers", "home repair",
+            "plumber", "locksmith", "movers", "home repair", "home insurance", "renters insurance",
         ]),
         // 2. KAHVE — COFFEE
         CategoryRule(category: .coffee, keywords: [
@@ -779,7 +798,7 @@ private enum Patterns {
         CategoryRule(category: .travel, keywords: [
             "uçak", "otel", "pansiyon", "pegasus", "sunexpress", "ajet", "tatil", "airbnb",
             "booking", "vize", "pasaport", "obilet",
-            "hotel", "vacation", "visa fee",
+            "hotel", "vacation",
         ]),
         // 6. BİRİKİM & YATIRIM — SAVINGS (harcama toplamını şişirmez)
         CategoryRule(category: .savings, keywords: [
@@ -828,6 +847,7 @@ private enum Patterns {
             "eczane", "ilaç", "vitamin", "doktor", "hastane", "muayene", "tahlil", "diş!", "dişçi",
             "diş hekimi", "dişhekimi", "gözlük", "optik", "lens", "fizyoterapi", "diyetisyen",
             "psikolog", "masaj", "spor salonu", "gym!", "macfit", "pilates", "veteriner",
+            "sağlık sigortası", "health insurance",
             // English
             "pharmacy", "cvs", "walgreens", "boots", "medicine", "doctor", "dentist", "hospital",
             "clinic", "fitness", "vet", "therapy",

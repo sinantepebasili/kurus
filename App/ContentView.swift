@@ -606,8 +606,10 @@ struct CategoryPickerSheet: View {
                             Text(category.title)
                                 .font(.system(size: 11.5, weight: .medium))
                                 .foregroundStyle(selected ? Theme.textPrimary : Theme.textSecondary)
-                                .lineLimit(1)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
                                 .minimumScaleFactor(0.75)
+                                .frame(height: 28, alignment: .top)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
@@ -625,7 +627,7 @@ struct CategoryPickerSheet: View {
         }
         .padding(Theme.gutter)
         .padding(.top, 8)
-        .presentationDetents([.height(470), .large])
+        .presentationDetents([.height(580), .large])
         .presentationDragIndicator(.visible)
         .presentationBackground(Theme.surface)
         .presentationCornerRadius(28)
