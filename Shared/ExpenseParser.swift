@@ -717,23 +717,31 @@ private enum Patterns {
     /// "yarım ekmek" → Yemek (Birikim'den önce) · "uber eats" → Yemek ("uber" Ulaşım'dan önce)
     /// "metro market" → Market · "şarj istasyonu" → Ulaşım · "gas bill" → Fatura, "gas" → Ulaşım
     static let categoryRules: [CategoryRule] = [
-        // 0. ARAÇ KİRALAMA (Fatura'daki "rent"/"kira"dan önce yakalanmalı)
+        // 0. ARAÇ KİRALAMA / BAKIMI (Konut'taki "rent", "kira", "maintenance"dan önce yakalanmalı)
         CategoryRule(category: .transport, keywords: [
-            "araç kiralama", "rent a car", "car rental",
+            "araç kiralama", "rent a car", "car rental", "car maintenance", "araç bakımı",
         ]),
-        // 1. KONUT, KİRA, AİDAT, FATURA, VERGİ — HOUSING & BILLS
+        // 1. FATURA, ABONE HİZMETLERİ, VERGİ, SİGORTA — BILLS
+        //    (Konut'tan önce: "emlak vergisi", "kira faturası", "telefon faturası" burada kalır)
         CategoryRule(category: .bills, keywords: [
-            "kira", "ev kirası", "aidat", "site aidatı", "apartman aidatı", "depozito", "emlak",
-            "kombi", "petek", "tesisat", "tadilat", "çilingir", "nakliye",
             "fatura", "elektrik", "gediz", "enerjisa", "ck boğaziçi",
             "su faturası", "izsu", "iski", "aski", "doğalgaz", "igdaş", "izmirgaz", "başkentgaz",
             "internet", "fiber", "superonline", "turknet", "kablonet", "millenicom",
             "telekom", "hat faturası", "telefon faturası", "kontör",
             "vergi", "mtv", "emlak vergisi", "harç", "noter", "sigorta", "kasko", "dask",
             // English
-            "rent", "mortgage", "hoa", "maintenance", "electricity", "electric bill", "water", "water bill",
+            "electricity", "electric bill", "water", "water bill",
             "gas bill", "utility", "utilities", "wifi", "phone bill", "verizon", "tmobile", "t mobile",
             "at&t", "att", "comcast", "xfinity", "insurance", "tax", "taxes",
+        ]),
+        // 1b. KONUT — KİRA, AİDAT, EV BAKIM / ONARIM — HOUSING
+        //     "Kira 25000", "Aidat 1850", "Rent 1500", "HOA 300" artık Fatura sayılmaz.
+        CategoryRule(category: .housing, keywords: [
+            "kira", "ev kirası", "aidat", "site aidatı", "apartman aidatı", "site yönetimi", "depozito",
+            "emlak", "emlakçı", "kombi", "petek", "tesisat", "tadilat", "çilingir", "nakliye", "boya badana",
+            // English
+            "rent", "mortgage", "hoa", "maintenance", "landlord", "security deposit", "property management",
+            "plumber", "locksmith", "movers", "home repair",
         ]),
         // 2. KAHVE — COFFEE
         CategoryRule(category: .coffee, keywords: [
