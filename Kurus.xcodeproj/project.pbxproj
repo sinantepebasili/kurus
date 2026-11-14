@@ -1,0 +1,774 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		02B4B43DE33C307CD5FFD54B /* BrandEngine.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = 8630CC489063CBE3A06B0D78;
+		};
+		467AE9AF2E2C4CDD1F97EFD9 /* SharedExpenseStore.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = C9B8987A2B165A6E3E189020;
+		};
+		4C47DD577083B35EF39448EF /* KurusApp.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = EB07A5392913A635EB512E4B;
+		};
+		54D6BC243B29C1551E33BF07 /* AddExpenseIntent.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = 20A3187FAD18F8635D483E67;
+		};
+		55D76C63BE62CE476F86B274 /* PrivacyInfo.xcprivacy in Resources */ = {
+			isa = PBXBuildFile;
+			fileRef = 23DA6D7374CE0CA94A81109A;
+		};
+		62B6C47CA07AC8166B5432DD /* Assets.xcassets in Resources */ = {
+			isa = PBXBuildFile;
+			fileRef = 18297A60B9E3FA7FC1BD99F1;
+		};
+		63EC8AB55282B3F1C898D7A1 /* BrandEngine.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = 8630CC489063CBE3A06B0D78;
+		};
+		75C1421399AE6983410BEA7A /* KurusWidget.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = 7E6CE1B944E8EBFC627A1136;
+		};
+		7AA892D204AA9B58CD1FAEB6 /* ContentView.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = 531F8B986CB62DC66D125D00;
+		};
+		7CDB4EB39C9A3B6A6BE2C9A4 /* SmartInputBarView.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = 1F515EBF2B21EFE884C96C9B;
+		};
+		8263DE830B612FDE173CA600 /* AddExpenseIntent.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = 20A3187FAD18F8635D483E67;
+		};
+		83FC11542C10D7CEEFEB458F /* ExpenseParser.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = 94F5BDE443E50ABAF5C1ACAE;
+		};
+		8FA8BD6179AA39149CFDF039 /* Theme.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = 4EC1FF35F8179A094C3AB745;
+		};
+		91BBE59DC90E4515F9C00C7C /* SwiftUI in Frameworks */ = {
+			isa = PBXBuildFile;
+			fileRef = 6B3016F92D46D1CC3FB1C398;
+		};
+		921FFBB3248D152E5DB32611 /* ExpenseParser.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = 94F5BDE443E50ABAF5C1ACAE;
+		};
+		933B8369F8FB07C539D8173A /* Theme.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = 4EC1FF35F8179A094C3AB745;
+		};
+		96E5C6DACAFC3CC9761EA9F3 /* ExportManager.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = A4230DB0AAFFA6A5F968B465;
+		};
+		A73DAF1F7CDEE0C0D00BF3DF /* Assets.xcassets in Resources */ = {
+			isa = PBXBuildFile;
+			fileRef = D59B301BE12A39FF7C501E5C;
+		};
+		A7888F0FF1FC09A98765B3FD /* PrivacyInfo.xcprivacy in Resources */ = {
+			isa = PBXBuildFile;
+			fileRef = 0365672E26E54D87A9D1F001;
+		};
+		BC73C601EF8E9205977AE2D0 /* WidgetKit in Frameworks */ = {
+			isa = PBXBuildFile;
+			fileRef = 20CB2BFD4A1989C48DA1B5D4;
+		};
+		C0FB14BA1CDEBDE9680EFF1B /* KurusWidgetExtension.appex in Embed Foundation Extensions */ = {
+			isa = PBXBuildFile;
+			fileRef = D0EE5D287151D375826ECBEC;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+				);
+			};
+		};
+		D0B3D92509751094E64CAA59 /* AutomationGuideSheet.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = 69858B467D368B7455633CB4;
+		};
+		D66E5CF5BCBBF210A65744FE /* SummaryCardView.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = B41FA47D167F6B95924A8845;
+		};
+		D7755FC4B7DADCC6DB8BEA4E /* SharedExpenseStore.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = C9B8987A2B165A6E3E189020;
+		};
+		E6CE0D9B539340CED45C9F6A /* ExpenseModel.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = 597256962D1320E988664EA7;
+		};
+		F66173476F021599F1425643 /* ExpenseModel.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = 597256962D1320E988664EA7;
+		};
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		99E6A51DA0B86FE48AEB34ED /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 46F86FAA6BBF9AC94A7E4595;
+			proxyType = 1;
+			remoteGlobalIDString = A62DC47BE893CF369F754CDC;
+			remoteInfo = KurusWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		496AF46EC2762DDF91F78F13 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C0FB14BA1CDEBDE9680EFF1B,
+			);
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		0365672E26E54D87A9D1F001 /* PrivacyInfo.xcprivacy */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.xml;
+			path = PrivacyInfo.xcprivacy;
+			sourceTree = "<group>";
+		};
+		18297A60B9E3FA7FC1BD99F1 /* Assets.xcassets */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.assetcatalog;
+			path = Assets.xcassets;
+			sourceTree = "<group>";
+		};
+		1F515EBF2B21EFE884C96C9B /* SmartInputBarView.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = SmartInputBarView.swift;
+			sourceTree = "<group>";
+		};
+		20A3187FAD18F8635D483E67 /* AddExpenseIntent.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = AddExpenseIntent.swift;
+			sourceTree = "<group>";
+		};
+		20CB2BFD4A1989C48DA1B5D4 /* WidgetKit.framework */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = wrapper.framework;
+			name = WidgetKit.framework;
+			path = System/Library/Frameworks/WidgetKit.framework;
+			sourceTree = SDKROOT;
+		};
+		23DA6D7374CE0CA94A81109A /* PrivacyInfo.xcprivacy */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.xml;
+			path = PrivacyInfo.xcprivacy;
+			sourceTree = "<group>";
+		};
+		4EC1FF35F8179A094C3AB745 /* Theme.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = Theme.swift;
+			sourceTree = "<group>";
+		};
+		531F8B986CB62DC66D125D00 /* ContentView.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = ContentView.swift;
+			sourceTree = "<group>";
+		};
+		597256962D1320E988664EA7 /* ExpenseModel.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = ExpenseModel.swift;
+			sourceTree = "<group>";
+		};
+		69858B467D368B7455633CB4 /* AutomationGuideSheet.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = AutomationGuideSheet.swift;
+			sourceTree = "<group>";
+		};
+		6B3016F92D46D1CC3FB1C398 /* SwiftUI.framework */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = wrapper.framework;
+			name = SwiftUI.framework;
+			path = System/Library/Frameworks/SwiftUI.framework;
+			sourceTree = SDKROOT;
+		};
+		70C3E1E6812D90445F07DE86 /* Kurus.entitlements */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = Kurus.entitlements;
+			sourceTree = "<group>";
+		};
+		7E6CE1B944E8EBFC627A1136 /* KurusWidget.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = KurusWidget.swift;
+			sourceTree = "<group>";
+		};
+		8509DD790DE7D4A444D69168 /* README.md */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = net.daringfireball.markdown;
+			path = README.md;
+			sourceTree = "<group>";
+		};
+		8630CC489063CBE3A06B0D78 /* BrandEngine.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = BrandEngine.swift;
+			sourceTree = "<group>";
+		};
+		94F5BDE443E50ABAF5C1ACAE /* ExpenseParser.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = ExpenseParser.swift;
+			sourceTree = "<group>";
+		};
+		9AFB45C064E2ACCDD8693EA9 /* Kurus.app */ = {
+			isa = PBXFileReference;
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			path = Kurus.app;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		A4230DB0AAFFA6A5F968B465 /* ExportManager.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = ExportManager.swift;
+			sourceTree = "<group>";
+		};
+		B41FA47D167F6B95924A8845 /* SummaryCardView.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = SummaryCardView.swift;
+			sourceTree = "<group>";
+		};
+		B644D499B755ABAD8014E968 /* KurusWidget.entitlements */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.entitlements;
+			path = KurusWidget.entitlements;
+			sourceTree = "<group>";
+		};
+		C9B8987A2B165A6E3E189020 /* SharedExpenseStore.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = SharedExpenseStore.swift;
+			sourceTree = "<group>";
+		};
+		D0EE5D287151D375826ECBEC /* KurusWidgetExtension.appex */ = {
+			isa = PBXFileReference;
+			explicitFileType = wrapper.app-extension;
+			includeInIndex = 0;
+			path = KurusWidgetExtension.appex;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		D59B301BE12A39FF7C501E5C /* Assets.xcassets */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.assetcatalog;
+			path = Assets.xcassets;
+			sourceTree = "<group>";
+		};
+		E13C64A991407F941ECFA54F /* Info.plist */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = Info.plist;
+			sourceTree = "<group>";
+		};
+		EB07A5392913A635EB512E4B /* KurusApp.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = KurusApp.swift;
+			sourceTree = "<group>";
+		};
+		EF20FA111E12B64F0B253C89 /* Info.plist */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			path = Info.plist;
+			sourceTree = "<group>";
+		};
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		1086C652A1DC08F38290131F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BC73C601EF8E9205977AE2D0,
+				91BBE59DC90E4515F9C00C7C,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DB575B01C9EDB90A46216F71 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		206D9AE6A6433106E0AF6963 /* Widget */ = {
+			isa = PBXGroup;
+			children = (
+				7E6CE1B944E8EBFC627A1136,
+				18297A60B9E3FA7FC1BD99F1,
+				23DA6D7374CE0CA94A81109A,
+				EF20FA111E12B64F0B253C89,
+				B644D499B755ABAD8014E968,
+			);
+			path = Widget;
+			sourceTree = "<group>";
+		};
+		2F3A6B1E78F896718625FF06 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				9AFB45C064E2ACCDD8693EA9,
+				D0EE5D287151D375826ECBEC,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		518DA81DB9B99529C0C0AEBE = {
+			isa = PBXGroup;
+			children = (
+				8509DD790DE7D4A444D69168,
+				D1D0524B025E57AFFF263442,
+				B46A6AFB1DC88CE23F6E63F1,
+				206D9AE6A6433106E0AF6963,
+				B687106895D06AA330DAFED5,
+				2F3A6B1E78F896718625FF06,
+			);
+			sourceTree = "<group>";
+		};
+		B46A6AFB1DC88CE23F6E63F1 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				4EC1FF35F8179A094C3AB745,
+				8630CC489063CBE3A06B0D78,
+				597256962D1320E988664EA7,
+				94F5BDE443E50ABAF5C1ACAE,
+				C9B8987A2B165A6E3E189020,
+				20A3187FAD18F8635D483E67,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		B687106895D06AA330DAFED5 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				20CB2BFD4A1989C48DA1B5D4,
+				6B3016F92D46D1CC3FB1C398,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		D1D0524B025E57AFFF263442 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				EB07A5392913A635EB512E4B,
+				531F8B986CB62DC66D125D00,
+				B41FA47D167F6B95924A8845,
+				1F515EBF2B21EFE884C96C9B,
+				69858B467D368B7455633CB4,
+				A4230DB0AAFFA6A5F968B465,
+				D59B301BE12A39FF7C501E5C,
+				0365672E26E54D87A9D1F001,
+				E13C64A991407F941ECFA54F,
+				70C3E1E6812D90445F07DE86,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A4C9E0A1DB58D9E69B92577E /* Kurus */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5505F9AF814A7F0992DE2402;
+			buildPhases = (
+				4821909E9BF9E73E471FEA84,
+				DB575B01C9EDB90A46216F71,
+				0BC40DDAB69570E4FBE53FB5,
+				496AF46EC2762DDF91F78F13,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				EE1DEC3FECAFB049B3EB4C70,
+			);
+			name = Kurus;
+			productName = Kurus;
+			productReference = 9AFB45C064E2ACCDD8693EA9;
+			productType = com.apple.product-type.application;
+		};
+		A62DC47BE893CF369F754CDC /* KurusWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8EB251B5FEF9F9B925BE1907;
+			buildPhases = (
+				37A859133C5B7A49CE597D35,
+				1086C652A1DC08F38290131F,
+				A1E3FBCA744C7E985076DC16,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = KurusWidgetExtension;
+			productName = KurusWidgetExtension;
+			productReference = D0EE5D287151D375826ECBEC;
+			productType = com.apple.product-type.app-extension;
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		46F86FAA6BBF9AC94A7E4595 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					A4C9E0A1DB58D9E69B92577E = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					A62DC47BE893CF369F754CDC = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = 7EF2517A8FE63F4681EC5EEA;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = tr;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				tr,
+				en,
+				Base,
+			);
+			mainGroup = 518DA81DB9B99529C0C0AEBE;
+			productRefGroup = 2F3A6B1E78F896718625FF06;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A4C9E0A1DB58D9E69B92577E,
+				A62DC47BE893CF369F754CDC,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		0BC40DDAB69570E4FBE53FB5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A73DAF1F7CDEE0C0D00BF3DF,
+				A7888F0FF1FC09A98765B3FD,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1E3FBCA744C7E985076DC16 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				62B6C47CA07AC8166B5432DD,
+				55D76C63BE62CE476F86B274,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		37A859133C5B7A49CE597D35 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				75C1421399AE6983410BEA7A,
+				933B8369F8FB07C539D8173A,
+				63EC8AB55282B3F1C898D7A1,
+				F66173476F021599F1425643,
+				921FFBB3248D152E5DB32611,
+				D7755FC4B7DADCC6DB8BEA4E,
+				54D6BC243B29C1551E33BF07,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4821909E9BF9E73E471FEA84 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4C47DD577083B35EF39448EF,
+				7AA892D204AA9B58CD1FAEB6,
+				D66E5CF5BCBBF210A65744FE,
+				7CDB4EB39C9A3B6A6BE2C9A4,
+				D0B3D92509751094E64CAA59,
+				96E5C6DACAFC3CC9761EA9F3,
+				8FA8BD6179AA39149CFDF039,
+				02B4B43DE33C307CD5FFD54B,
+				E6CE0D9B539340CED45C9F6A,
+				83FC11542C10D7CEEFEB458F,
+				467AE9AF2E2C4CDD1F97EFD9,
+				8263DE830B612FDE173CA600,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		EE1DEC3FECAFB049B3EB4C70 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A62DC47BE893CF369F754CDC;
+			targetProxy = 99E6A51DA0B86FE48AEB34ED;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		4C95F91A6D5CD87BB5DB8FDD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				COPY_PHASE_STRIP = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				DEBUG_INFORMATION_FORMAT = dwarf-with-dsym;
+				ENABLE_NS_ASSERTIONS = NO;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		699FCDBED06EC64C8A6B513F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = App/Kurus.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Kuruş";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = public.app-category.finance;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kurus.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		969595A508627F35A110362C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = -Onone;
+			};
+			name = Debug;
+		};
+		C0DD1C3E4BFC124D878FE440 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = App/Kurus.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Kuruş";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = public.app-category.finance;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kurus.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		D575AB479E12FC2A0F74F307 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = Widget/KurusWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Widget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Kuruş";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kurus.app.KurusWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		F4E296410894D8ED26377CE5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = Widget/KurusWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Widget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Kuruş";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kurus.app.KurusWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		5505F9AF814A7F0992DE2402 /* Build configuration list for PBXNativeTarget "Kurus" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C0DD1C3E4BFC124D878FE440,
+				699FCDBED06EC64C8A6B513F,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7EF2517A8FE63F4681EC5EEA /* Build configuration list for PBXProject "Kurus" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				969595A508627F35A110362C,
+				4C95F91A6D5CD87BB5DB8FDD,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8EB251B5FEF9F9B925BE1907 /* Build configuration list for PBXNativeTarget "KurusWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D575AB479E12FC2A0F74F307,
+				F4E296410894D8ED26377CE5,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+	};
+	rootObject = 46F86FAA6BBF9AC94A7E4595 /* Project object */;
+}
