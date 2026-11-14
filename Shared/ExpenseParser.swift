@@ -33,6 +33,8 @@ struct ParsedExpense: Equatable, Sendable {
 
     var isValid: Bool { (amount ?? 0) > 0 }
 
+    var isIncome: Bool { category == .income }
+
     var brand: Brand? { brandID.flatMap(BrandEngine.brand(id:)) }
 
     var perInstallment: Decimal? {
@@ -98,6 +100,17 @@ enum ExpenseParser {
         // 4) Nakit
         result.isCash = norm.containsWord("nakit")
 
+        // 4b) Gelir: başta "+" ("+Maaş 65000"), sayıya yapışık "+" ("İade +450") ya da gelir kelimeleri.
+        //     Harfe yapışık "+" ("Disney+ 349") gelir sayılmaz.
+        let incomeBySign = raw.hasPrefix("+")
+            || raw.range(of: #"(?<![\p{L}\p{N}])\+\s*\d"#, options: .regularExpression) != nil
+        let incomeByWord = Patterns.incomeWords.contains { keyword in
+            let exact = keyword.hasSuffix("!")
+            return norm.containsWord(exact ? String(keyword.dropLast()) : keyword, prefixOnly: !exact)
+        }
+        let isIncome = incomeBySign || incomeByWord
+        if isIncome { result.installmentCount = 1 }
+
         // 5) Tutar — önce TL/TRY/₺ ile etiketli olan, yoksa en büyük sayı
         let candidates: [Candidate] = matches(Patterns.number, in: working).compactMap { m in
             guard let g = m.group(1), let value = decimal(from: String(working[g])), value > 0 else { return nil }
@@ -128,9 +141,16 @@ enum ExpenseParser {
         }
 
         // 9) Kategori ve tekrarlayan gider
-        result.category = brand?.category ?? inferCategory(norm) ?? .other
-        result.isRecurring = (brand?.isSubscription ?? false)
-            || Patterns.recurringWords.contains { norm.containsWord($0, prefixOnly: true) }
+        if isIncome {
+            result.category = .income
+            result.isRecurring = Patterns.recurringIncomeWords.contains { norm.containsWord($0, prefixOnly: true) }
+        } else {
+            // Kategori, taksit/kart/tutar ayıklanmış metinden çıkarılır: "3 taksit" içindeki
+            // "taksi" önekinin Ulaşım'a düşmesi ("Yazıcı 4500 3 taksit" → Ulaşım) böylece engellenir.
+            result.category = brand?.category ?? inferCategory(working.kurusNormalized) ?? .other
+            result.isRecurring = (brand?.isSubscription ?? false)
+                || Patterns.recurringWords.contains { norm.containsWord($0, prefixOnly: true) }
+        }
 
         let finalTitle = title.isEmpty ? result.category.title : title
         result.title = String(finalTitle.prefix(42))
@@ -169,7 +189,7 @@ enum ExpenseParser {
             }
 
         let joined = tokens.joined(separator: " ")
-            .trimmingCharacters(in: CharacterSet(charactersIn: " -–—,.;:/*•"))
+            .trimmingCharacters(in: CharacterSet(charactersIn: " -–—,.;:/*•+"))
         return joined.capitalizedFirstTR
     }
 
@@ -294,17 +314,20 @@ private enum Patterns {
 
     static let recurringWords = ["abonelik", "aylik", "uyelik", "premium"]
 
+    /// Gelir kelimeleri ("!" → tam kelime). "Bonus" bir kart adı olduğu için bilinçli olarak yok.
+    static let incomeWords = ["maas", "gelir", "iade", "prim!", "ikramiye", "kira geliri"]
+    static let recurringIncomeWords = ["maas", "kira geliri"]
+
     struct CategoryRule {
         let category: ExpenseCategory
         /// Sonu "!" ile biten kelimeler tam eşleşir; diğerleri kelime başı (önek) eşleşir.
         let keywords: [String]
     }
 
+    /// Sıra önemlidir; daha özgül kurallar önce gelir:
+    /// "telefon faturası" → Fatura (Teknoloji'den önce), "yarım ekmek" → Yemek (Birikim'den önce),
+    /// "tam pansiyon" → Seyahat. Tüm eşleşmeler `\b` kelime sınırıyla yapılır.
     static let categoryRules: [CategoryRule] = [
-        CategoryRule(category: .savings, keywords: [
-            "birikim", "yatirim", "altin", "doviz", "borsa", "hisse", "kumbara", "fon!", "bes!",
-            "usd!", "eur!", "dolar", "euro", "kripto", "bitcoin", "mevduat"
-        ]),
         CategoryRule(category: .bills, keywords: [
             "fatura", "elektrik", "dogalgaz", "su faturasi", "internet", "kira", "aidat",
             "telefon faturasi", "enerjisa", "igdas", "iski", "superonline"
@@ -316,11 +339,20 @@ private enum Patterns {
         CategoryRule(category: .food, keywords: [
             "yemek", "restoran", "lokanta", "doner", "burger", "pizza", "kebap", "kebab",
             "lahmacun", "simit", "pide", "sushi", "kofte", "kahvalti", "ogle", "aksam yemegi",
-            "tatli", "baklava", "manti"
+            "tatli", "baklava", "manti", "ekmek"
         ]),
         CategoryRule(category: .market, keywords: [
             "market", "a101!", "bim!", "sok!", "carrefour", "file!", "macrocenter", "manav",
             "kasap", "firin", "bakkal", "sarkuteri"
+        ]),
+        CategoryRule(category: .travel, keywords: [
+            "ucak", "otel", "pansiyon", "pegasus", "sunexpress", "ajet", "tatil", "airbnb",
+            "booking", "vize", "pasaport", "obilet"
+        ]),
+        CategoryRule(category: .savings, keywords: [
+            "birikim", "yatirim", "altin", "gumus", "gram!", "ceyrek", "yarim!", "tam!",
+            "cumhuriyet", "ons!", "fon!", "hisse", "borsa", "kripto", "dolar", "euro",
+            "bitcoin", "doviz", "kumbara", "mevduat", "bes!", "usd!", "eur!"
         ]),
         CategoryRule(category: .transport, keywords: [
             "taksi", "uber", "bitaksi", "benzin", "akaryakit", "mazot", "dizel", "otopark",
@@ -338,16 +370,16 @@ private enum Patterns {
             "eczane", "ilac", "hastane", "doktor", "dis!", "dishekimi", "muayene", "vitamin",
             "spor salonu", "gym!", "diyetisyen", "psikolog"
         ]),
-        CategoryRule(category: .travel, keywords: [
-            "ucak", "otel", "pegasus", "sunexpress", "ajet", "tatil", "airbnb", "booking",
-            "vize", "pasaport", "obilet"
-        ]),
         CategoryRule(category: .education, keywords: [
             "kurs", "kitap", "okul", "udemy", "egitim", "harc!", "kirtasiye", "ders"
         ]),
+        CategoryRule(category: .technology, keywords: [
+            "yazici", "bilgisayar", "laptop", "macbook", "telefon", "iphone", "ipad", "kulaklik",
+            "airpods", "sarj", "kablo", "monitor", "klavye", "mouse", "tablet", "samsung",
+            "teknosa", "mediamarkt", "vatan bilgisayar"
+        ]),
         CategoryRule(category: .shopping, keywords: [
-            "telefon", "iphone", "samsung", "laptop", "bilgisayar", "kiyafet", "ayakkabi",
-            "zara", "h&m", "lcw", "amazon", "teknosa", "mediamarkt", "ikea", "koton",
+            "kiyafet", "ayakkabi", "zara", "h&m", "lcw", "amazon", "ikea", "koton",
             "mavi!", "defacto", "kozmetik", "parfum", "sephora", "watsons", "gratis"
         ]),
     ]
@@ -368,7 +400,9 @@ extension String {
     /// Harf/rakam sınırlarına saygılı kelime araması (normalize metinde).
     func containsWord(_ word: String, prefixOnly: Bool = false) -> Bool {
         let escaped = NSRegularExpression.escapedPattern(for: word)
-        let pattern = "(?<![\\p{L}\\p{N}])" + escaped + (prefixOnly ? "" : "(?![\\p{L}\\p{N}])")
+        // \b kelime sınırı: anahtar kelime ancak bir kelimenin BAŞINDA eşleşir ("yazici" içindeki
+        // alt diziler başka kurallara düşmez). prefixOnly=false ise kelimenin tamamı eşleşmelidir.
+        let pattern = "\\b" + escaped + (prefixOnly ? "" : "\\b")
         return range(of: pattern, options: .regularExpression) != nil
     }
 

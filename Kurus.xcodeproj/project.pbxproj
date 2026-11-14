@@ -11,6 +11,10 @@
 			isa = PBXBuildFile;
 			fileRef = 8630CC489063CBE3A06B0D78;
 		};
+		0DF714FA2CFF3303A8CF7BCE /* CategoryBreakdownSheet.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = AE91E4A2F27199611E1133D6;
+		};
 		467AE9AF2E2C4CDD1F97EFD9 /* SharedExpenseStore.swift in Sources */ = {
 			isa = PBXBuildFile;
 			fileRef = C9B8987A2B165A6E3E189020;
@@ -74,6 +78,10 @@
 		96E5C6DACAFC3CC9761EA9F3 /* ExportManager.swift in Sources */ = {
 			isa = PBXBuildFile;
 			fileRef = A4230DB0AAFFA6A5F968B465;
+		};
+		9FD66F03F7BD3D04981026B3 /* BrandLogoView.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = BDB0FD55639C02365AEDFBBC;
 		};
 		A73DAF1F7CDEE0C0D00BF3DF /* Assets.xcassets in Resources */ = {
 			isa = PBXBuildFile;
@@ -254,6 +262,12 @@
 			path = ExportManager.swift;
 			sourceTree = "<group>";
 		};
+		AE91E4A2F27199611E1133D6 /* CategoryBreakdownSheet.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = CategoryBreakdownSheet.swift;
+			sourceTree = "<group>";
+		};
 		B41FA47D167F6B95924A8845 /* SummaryCardView.swift */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
@@ -264,6 +278,12 @@
 			isa = PBXFileReference;
 			lastKnownFileType = text.plist.entitlements;
 			path = KurusWidget.entitlements;
+			sourceTree = "<group>";
+		};
+		BDB0FD55639C02365AEDFBBC /* BrandLogoView.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = BrandLogoView.swift;
 			sourceTree = "<group>";
 		};
 		C9B8987A2B165A6E3E189020 /* SharedExpenseStore.swift */ = {
@@ -389,6 +409,8 @@
 				1F515EBF2B21EFE884C96C9B,
 				69858B467D368B7455633CB4,
 				A4230DB0AAFFA6A5F968B465,
+				BDB0FD55639C02365AEDFBBC,
+				AE91E4A2F27199611E1133D6,
 				D59B301BE12A39FF7C501E5C,
 				0365672E26E54D87A9D1F001,
 				E13C64A991407F941ECFA54F,
@@ -520,6 +542,8 @@
 				7CDB4EB39C9A3B6A6BE2C9A4,
 				D0B3D92509751094E64CAA59,
 				96E5C6DACAFC3CC9761EA9F3,
+				9FD66F03F7BD3D04981026B3,
+				0DF714FA2CFF3303A8CF7BCE,
 				8FA8BD6179AA39149CFDF039,
 				02B4B43DE33C307CD5FFD54B,
 				E6CE0D9B539340CED45C9F6A,

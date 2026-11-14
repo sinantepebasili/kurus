@@ -45,6 +45,7 @@ enum Theme {
     static let amber   = Color(hex: "FF9F0A")  // Kehribar
     static let ocean   = Color(hex: "0A84FF")  // Okyanus
     static let violet  = Color(hex: "BF5AF2")  // Birikim Moru
+    static let indigo  = Color(hex: "5E5CE6")  // Teknoloji
 
     // Açık zeminli rozetlerde koyu glif ve PDF kâğıdı
     static let ink   = Color(hex: "141417")

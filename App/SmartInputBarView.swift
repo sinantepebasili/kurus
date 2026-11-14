@@ -160,7 +160,7 @@ struct LiveParsePill: View {
                 ParseTag(symbol: parsed.isCash ? "banknote.fill" : "creditcard.fill", text: card, tint: Theme.ocean)
             }
             if parsed.isRecurring {
-                ParseTag(symbol: "repeat", text: compact ? nil : "Abonelik", tint: Theme.violet)
+                ParseTag(symbol: "repeat", text: compact ? nil : (parsed.isIncome ? "Aylık" : "Abonelik"), tint: Theme.violet)
             }
         }
     }
@@ -178,7 +178,13 @@ struct LiveParsePill: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                 } else {
-                    AmountText(amount: amount, size: 17, weight: .bold)
+                    AmountText(
+                        amount: amount,
+                        size: 17,
+                        weight: .bold,
+                        color: parsed.isIncome ? Theme.emerald : Theme.textPrimary,
+                        prefix: parsed.isIncome ? "+" : ""
+                    )
                 }
             } else {
                 Text("tutar?")

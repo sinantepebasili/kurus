@@ -16,6 +16,7 @@ struct ContentView: View {
     @State private var inputText = ""
     @FocusState private var inputFocused: Bool
     @State private var filter: CardFilter = .all
+    @State private var selectedMonth = Ledger.startOfMonth(.now)
 
     @State private var showGuide = false
     @State private var categoryTarget: Expense?
@@ -30,8 +31,13 @@ struct ContentView: View {
 
     // MARK: - Türetilmiş veri
 
+    /// Seçili ayın kayıtları; gelecek aylarda tahmini abonelikler de dahil.
+    private var monthEntries: (items: [Expense], projectedIDs: Set<UUID>) {
+        Ledger.monthEntries(in: store.snapshot, month: selectedMonth)
+    }
+
     private var visibleExpenses: [Expense] {
-        Ledger.inMonth(store.expenses)
+        monthEntries.items
             .filter { filter.includes($0) }
             .sorted { $0.date > $1.date }
     }
@@ -50,6 +56,8 @@ struct ContentView: View {
     // MARK: - Gövde
 
     var body: some View {
+        let projectedIDs = monthEntries.projectedIDs
+
         ZStack(alignment: .bottom) {
             Theme.background.ignoresSafeArea()
 
@@ -57,7 +65,7 @@ struct ContentView: View {
                 header
                     .plainRow(EdgeInsets(top: 8, leading: Theme.gutter, bottom: 6, trailing: Theme.gutter))
 
-                SummaryCardView(filter: $filter, isPrivate: $isPrivate)
+                SummaryCardView(filter: $filter, isPrivate: $isPrivate, month: $selectedMonth)
                     .plainRow(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
 
                 if showsDemoBanner {
@@ -76,23 +84,29 @@ struct ContentView: View {
                         .plainRow(EdgeInsets(top: 18, leading: Theme.gutter + 4, bottom: 6, trailing: Theme.gutter + 4))
 
                     ForEach(group.items) { expense in
+                        let isProjected = projectedIDs.contains(expense.id)
                         ExpenseRowView(
                             expense: expense,
                             card: expense.cardID.flatMap { store.card(id: $0) },
                             isFresh: freshIDs.contains(expense.id),
+                            isProjected: isProjected,
                             onIconTap: {
+                                // Tahmini kayıtlar kalıcı değildir; düzenlenemez.
+                                guard !isProjected else { return }
                                 Haptics.selection()
                                 categoryTarget = expense
                             }
                         )
                         .plainRow(EdgeInsets(top: 3, leading: Theme.gutter, bottom: 3, trailing: Theme.gutter))
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                delete(expense)
-                            } label: {
-                                Label("Sil", systemImage: "trash.fill")
+                        .swipeActions(edge: .trailing, allowsFullSwipe: !isProjected) {
+                            if !isProjected {
+                                Button(role: .destructive) {
+                                    delete(expense)
+                                } label: {
+                                    Label("Sil", systemImage: "trash.fill")
+                                }
+                                .tint(Theme.coral)
                             }
-                            .tint(Theme.coral)
                         }
                     }
                 }
@@ -149,11 +163,10 @@ struct ContentView: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: 10) {
-            Text("Kuruş")
-                .font(.system(size: 34, weight: .bold))
-                .foregroundStyle(Theme.textPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
+            BrandHeaderView()
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Kuruş")
+                .accessibilityAddTraits(.isHeader)
 
             Spacer(minLength: 8)
 
@@ -179,11 +192,14 @@ struct ContentView: View {
 
                 ShareLink(
                     item: PDFExport(
-                        month: .now,
-                        expenses: Ledger.inMonth(store.expenses),
+                        month: selectedMonth,
+                        expenses: Ledger.inMonth(store.expenses, of: selectedMonth),
                         cards: store.cards,
-                        budget: store.monthlyBudget,
-                        fileName: "\(ExportManager.fileStem())-Ekstre.pdf"
+                        budget: Ledger.effectiveBudget(
+                            Ledger.inMonth(store.expenses, of: selectedMonth),
+                            manual: store.monthlyBudget
+                        ),
+                        fileName: "\(ExportManager.fileStem(for: selectedMonth))-Ekstre.pdf"
                     ),
                     preview: SharePreview("Kuruş Ekstresi", image: Image(systemName: "doc.richtext"))
                 ) {
@@ -254,10 +270,10 @@ struct ContentView: View {
             Image(systemName: "text.cursor")
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(Theme.textMuted)
-            Text(filter == .all ? "Bu ay henüz harcama yok" : "Bu havuzda bu ay harcama yok")
+            Text(emptyTitle)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Theme.textPrimary)
-            Text("Aşağıya “Kahve 145” yazıp Return’e bas.")
+            Text(emptySubtitle)
                 .font(.system(size: 14))
                 .foregroundStyle(Theme.textSecondary)
                 .multilineTextAlignment(.center)
@@ -266,20 +282,34 @@ struct ContentView: View {
         .padding(.vertical, 28)
     }
 
+    private var emptyTitle: String {
+        let name = KurusDate.monthName(selectedMonth)
+        if Ledger.isFutureMonth(selectedMonth) { return "\(name) için planlı ödeme yok" }
+        if !Ledger.isCurrentMonth(selectedMonth) { return "\(name) ayında kayıt yok" }
+        return filter == .all ? "Bu ay henüz harcama yok" : "Bu havuzda bu ay harcama yok"
+    }
+
+    private var emptySubtitle: String {
+        if Ledger.isFutureMonth(selectedMonth) { return "Taksitler ve abonelikler burada kendiliğinden belirir." }
+        if !Ledger.isCurrentMonth(selectedMonth) { return "Bugüne dönmek için ay başlığına dokun." }
+        return "Aşağıya “Kahve 145” ya da “+Maaş 65000” yazıp Return’e bas."
+    }
+
     private func dayHeader(_ group: DayGroup) -> some View {
         HStack {
             Text(KurusDate.dayHeader(group.day))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.textSecondary)
             Spacer()
-            AmountText(
-                amount: Ledger.spending(group.items),
-                size: 13,
-                weight: .semibold,
-                color: Theme.textSecondary,
-                showsFraction: false
-            )
-            .privacyBlur()
+            let spent = Ledger.spending(group.items)
+            let earned = Ledger.income(group.items)
+            if spent > 0 || earned == 0 {
+                AmountText(amount: spent, size: 13, weight: .semibold, color: Theme.textSecondary, showsFraction: false)
+                    .privacyBlur()
+            } else {
+                AmountText(amount: earned, size: 13, weight: .semibold, color: Theme.emerald.opacity(0.8), showsFraction: false, prefix: "+")
+                    .privacyBlur()
+            }
         }
     }
 
@@ -290,6 +320,11 @@ struct ContentView: View {
             store.add(parsed, isDemo: isDemo)
         }
         guard let first = created.first else { return }
+
+        // Geçmiş/gelecek bir ay açıkken eklenen kayıt bugüne düşer: kullanıcı onu görsün.
+        if !Ledger.isCurrentMonth(selectedMonth) {
+            withAnimation(Theme.spring) { selectedMonth = Ledger.startOfMonth(.now) }
+        }
 
         if !filter.includes(first) {
             withAnimation(Theme.spring) { filter = .all }
@@ -411,6 +446,7 @@ struct ExpenseRowView: View {
     let expense: Expense
     let card: PaymentCard?
     var isFresh: Bool = false
+    var isProjected: Bool = false
     var onIconTap: () -> Void
 
     var body: some View {
@@ -449,6 +485,15 @@ struct ExpenseRowView: View {
                             .background(Theme.amber.opacity(0.14), in: Capsule())
                             .fixedSize()
                     }
+                    if isProjected {
+                        Text("Tahmini")
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .foregroundStyle(Theme.ocean)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Theme.ocean.opacity(0.14), in: Capsule())
+                            .fixedSize()
+                    }
                     if expense.isDemo {
                         Text("Örnek")
                             .font(.system(size: 10.5, weight: .semibold))
@@ -475,7 +520,8 @@ struct ExpenseRowView: View {
                     amount: expense.amount,
                     size: 16,
                     weight: .semibold,
-                    color: expense.category.isSavings ? Theme.violet : Theme.textPrimary
+                    color: amountColor,
+                    prefix: expense.category.isIncome ? "+" : ""
                 )
                 if let installment = expense.installment {
                     Text("toplam \(CurrencyFormat.string(installment.total, fraction: false))")
@@ -496,14 +542,25 @@ struct ExpenseRowView: View {
                 .strokeBorder(Theme.emerald.opacity(isFresh ? 0.55 : 0), lineWidth: 1)
         )
         .contentShape(Rectangle())
+        .opacity(isProjected ? 0.72 : 1)
+    }
+
+    private var amountColor: Color {
+        if expense.category.isIncome { return Theme.emerald }
+        if expense.category.isSavings { return Theme.violet }
+        return Theme.textPrimary
     }
 
     private var subtitle: String {
-        [
-            expense.category.title,
-            card?.pillTitle ?? "Nakit",
-            KurusDate.time(expense.date),
-        ].joined(separator: " · ")
+        var parts = [expense.category.title]
+        if let card {
+            parts.append(card.pillTitle)
+        } else if !expense.category.isIncome {
+            parts.append("Nakit")
+        }
+        // Tahmini kayıtlarda saat anlamsız; gün gösterilir.
+        parts.append(isProjected ? KurusDate.shortDay(expense.date) : KurusDate.time(expense.date))
+        return parts.joined(separator: " · ")
     }
 }
 

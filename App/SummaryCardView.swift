@@ -1,6 +1,7 @@
 //
 //  SummaryCardView.swift
-//  Kuruş — Aylık özet, satır içi bütçe, harcama/birikim çubuğu, kart hapları, yaklaşan ödemeler
+//  Kuruş — Aylık özet, ay geçişi, satır içi bütçe / gelir havuzu, harcama-birikim çubuğu,
+//  kart hapları, yaklaşan ödemeler ve kategori analizi girişi
 //
 //  Hedef: App
 //
@@ -9,9 +10,12 @@ import SwiftUI
 
 struct SummaryCardView: View {
     @Environment(SharedExpenseStore.self) private var store
+    @Environment(\.privacyMode) private var privacyMode
 
     @Binding var filter: CardFilter
     @Binding var isPrivate: Bool
+    /// Görüntülenen ayın ilk günü (`Ledger.startOfMonth`).
+    @Binding var month: Date
 
     @State private var isEditingBudget = false
     @State private var budgetDraft = ""
@@ -20,20 +24,53 @@ struct SummaryCardView: View {
     @State private var renamingCard: PaymentCard?
     @State private var renameDraft = ""
 
-    private var monthExpenses: [Expense] {
-        Ledger.inMonth(store.expenses).filter { filter.includes($0) }
+    @State private var showBreakdown = false
+
+    // MARK: - Ay durumu
+
+    private var isCurrentMonth: Bool { Ledger.isCurrentMonth(month) }
+    private var isFutureMonth: Bool { Ledger.isFutureMonth(month) }
+
+    /// En eski kayıtlı ay (kayıt yoksa bu ay).
+    private var earliestMonth: Date {
+        let oldest = store.expenses.map(\.date).min() ?? .now
+        return Ledger.startOfMonth(min(oldest, .now))
     }
 
+    /// Taksit ve abonelik yükünü görmek için 12 ay ileri.
+    private var latestMonth: Date {
+        Ledger.startOfMonth(Ledger.calendar.date(byAdding: .month, value: 12, to: .now) ?? .now)
+    }
+
+    private var canGoBack: Bool { month > earliestMonth }
+    private var canGoForward: Bool { month < latestMonth }
+
+    // MARK: - Gövde
+
     var body: some View {
-        let month = monthExpenses
-        let spend = Ledger.spending(month)
-        let saved = Ledger.savings(month)
+        let all = Ledger.monthEntries(in: store.snapshot, month: month).items
+        let filtered = all.filter { filter.includes($0) }
+        let spend = Ledger.spending(filtered)
+        let saved = Ledger.savings(filtered)
+        let allSpend = Ledger.spending(all)
+        let incomeDriven = Ledger.income(all) > 0
+        let budget = Ledger.effectiveBudget(all, manual: store.monthlyBudget)
 
         VStack(alignment: .leading, spacing: 16) {
-            mainCard(spend: spend, saved: saved)
-                .padding(.horizontal, Theme.gutter)
+            mainCard(
+                spend: spend,
+                saved: saved,
+                allSpend: allSpend,
+                budget: budget,
+                incomeDriven: incomeDriven
+            )
+            .padding(.horizontal, Theme.gutter)
+
             cardPills
-            upcomingStrip
+
+            if isCurrentMonth {
+                upcomingStrip
+            }
         }
         .alert(
             "Kart Adı",
@@ -52,21 +89,31 @@ struct SummaryCardView: View {
         } message: { card in
             Text(card.last4.map { "••\($0) ile biten kart" } ?? "\(card.bankName) kartı")
         }
+        .sheet(isPresented: $showBreakdown) {
+            CategoryBreakdownSheet(
+                month: month,
+                expenses: filtered,
+                scopeTitle: scopeTitle,
+                isProjection: isFutureMonth
+            )
+            .environment(\.privacyMode, privacyMode)
+        }
     }
 
     // MARK: - Ana kart
 
-    private func mainCard(spend: Decimal, saved: Decimal) -> some View {
+    private func mainCard(
+        spend: Decimal,
+        saved: Decimal,
+        allSpend: Decimal,
+        budget: Decimal,
+        incomeDriven: Bool
+    ) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .center) {
-                Text(headerTitle)
-                    .font(.system(size: 12, weight: .semibold))
-                    .tracking(0.8)
-                    .foregroundStyle(Theme.textSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+            HStack(alignment: .center, spacing: 8) {
+                monthStepper
                 Spacer(minLength: 8)
-                if filter == .all { usageChip(spend: spend) }
+                analysisChip(spend: spend, budget: budget)
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -81,13 +128,13 @@ struct SummaryCardView: View {
                 .layoutPriority(1)
                 .accessibilityHint("Dokunarak tutarları gizle ya da göster")
 
-                budgetLimit
+                budgetLimit(budget: budget, incomeDriven: incomeDriven)
                     .fixedSize()
 
                 Spacer(minLength: 0)
             }
 
-            budgetCaption(spend: spend)
+            budgetCaption(spend: spend, allSpend: allSpend, budget: budget, incomeDriven: incomeDriven)
 
             ratioBar(spend: spend, saved: saved)
         }
@@ -95,37 +142,133 @@ struct SummaryCardView: View {
         .craftCard()
     }
 
-    private var headerTitle: String {
-        let month = KurusDate.monthName(.now).uppercased(with: KurusDate.locale)
-        switch filter {
-        case .all: return "\(month) · TÜM HARCAMALAR"
-        case .cash: return "\(month) · NAKİT"
-        case .card(let id):
-            let name = store.card(id: id)?.pillTitle ?? "KART"
-            return "\(month) · \(name.uppercased(with: KurusDate.locale))"
+    // MARK: - Ay geçişi  ‹ KASIM · TÜM HARCAMALAR ›
+
+    private var monthStepper: some View {
+        HStack(spacing: 6) {
+            stepButton("chevron.left", enabled: canGoBack, label: "Önceki ay") { shiftMonth(by: -1) }
+
+            Button {
+                guard !isCurrentMonth else { return }
+                withAnimation(Theme.spring) { month = Ledger.startOfMonth(.now) }
+                Haptics.selection()
+            } label: {
+                Text(headerTitle)
+                    .font(.system(size: 12, weight: .semibold))
+                    .tracking(0.8)
+                    .foregroundStyle(isCurrentMonth ? Theme.textSecondary : Theme.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .contentTransition(.interpolate)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(isCurrentMonth ? "" : "Bu aya dönmek için dokun")
+
+            stepButton("chevron.right", enabled: canGoForward, label: "Sonraki ay") { shiftMonth(by: 1) }
         }
     }
 
-    private func usageChip(spend: Decimal) -> some View {
-        let budget = store.monthlyBudget
-        let usage = budget > 0 ? (spend / budget).doubleValue : 0
-        let tint = usage > 1 ? Theme.coral : (usage > 0.8 ? Theme.amber : Theme.emerald)
-        return Text("%\(Int((usage * 100).rounded()))")
-            .font(.system(size: 12, weight: .bold))
-            .monospacedDigit()
-            .foregroundStyle(tint)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(tint.opacity(0.14), in: Capsule())
-            .contentTransition(.numericText(value: usage))
-            .privacyBlur()
+    private func stepButton(_ symbol: String, enabled: Bool, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(enabled ? Theme.textSecondary : Theme.textMuted)
+                .frame(width: 24, height: 24)
+                .background(Theme.elevated, in: Circle())
+                .overlay(Circle().strokeBorder(Theme.hairline, lineWidth: 1))
+                .padding(4)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .padding(-4)
+        .accessibilityLabel(label)
     }
 
-    // MARK: - Satır içi bütçe düzenleme
+    private func shiftMonth(by delta: Int) {
+        guard let target = Ledger.calendar.date(byAdding: .month, value: delta, to: month) else { return }
+        if isEditingBudget { commitBudget() }
+        withAnimation(Theme.spring) { month = Ledger.startOfMonth(target) }
+        Haptics.selection()
+    }
+
+    private var monthLabel: String {
+        let sameYear = Ledger.calendar.isDate(month, equalTo: .now, toGranularity: .year)
+        let text = sameYear ? KurusDate.monthName(month) : KurusDate.monthYear(month)
+        return text.uppercased(with: KurusDate.locale)
+    }
+
+    private var filterLabel: String {
+        switch filter {
+        case .all: return isFutureMonth ? "PLANLANAN" : "TÜM HARCAMALAR"
+        case .cash: return "NAKİT"
+        case .card(let id):
+            return (store.card(id: id)?.pillTitle ?? "KART").uppercased(with: KurusDate.locale)
+        }
+    }
+
+    private var headerTitle: String { "\(monthLabel) · \(filterLabel)" }
+
+    private var scopeTitle: String {
+        let scope: String
+        switch filter {
+        case .all: scope = "Tüm harcamalar"
+        case .cash: scope = "Nakit"
+        case .card(let id): scope = store.card(id: id)?.pillTitle ?? "Kart"
+        }
+        return "\(KurusDate.monthYear(month)) · \(scope)"
+    }
+
+    // MARK: - % rozeti → kategori analizi
+
+    private func analysisChip(spend: Decimal, budget: Decimal) -> some View {
+        let usage = budget > 0 ? (spend / budget).doubleValue : 0
+        let tint: Color = filter != .all
+            ? Theme.ocean
+            : (usage > 1 ? Theme.coral : (usage > 0.8 ? Theme.amber : Theme.emerald))
+
+        return Button {
+            showBreakdown = true
+            Haptics.selection()
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "chart.pie.fill")
+                    .font(.system(size: 9, weight: .bold))
+                if filter == .all {
+                    Text("%\(Int((usage * 100).rounded()))")
+                        .font(.system(size: 12, weight: .bold))
+                        .monospacedDigit()
+                        .contentTransition(.numericText(value: usage))
+                        .privacyBlur()
+                }
+            }
+            .foregroundStyle(tint)
+            .padding(.horizontal, 8)
+            .frame(height: 22)
+            .background(tint.opacity(0.14), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Kategori analizi")
+    }
+
+    // MARK: - Bütçe limiti / gelir havuzu
 
     @ViewBuilder
-    private var budgetLimit: some View {
-        if isEditingBudget {
+    private func budgetLimit(budget: Decimal, incomeDriven: Bool) -> some View {
+        if incomeDriven {
+            // O ay gelir girildiyse limit = toplam gelir (salt okunur).
+            AmountText(
+                amount: budget,
+                size: 17,
+                weight: .semibold,
+                color: Theme.emerald.opacity(0.75),
+                showsFraction: false,
+                prefix: "/ "
+            )
+            .privacyBlur()
+            .accessibilityLabel("Bu ayın geliri \(CurrencyFormat.string(budget, fraction: false))")
+        } else if isEditingBudget {
             HStack(spacing: 4) {
                 Text("/ ₺")
                     .font(.system(size: 17, weight: .semibold))
@@ -185,32 +328,42 @@ struct SummaryCardView: View {
 
     // MARK: - Bütçe açıklaması
 
-    @ViewBuilder
-    private func budgetCaption(spend: Decimal) -> some View {
-        Group {
-            if filter == .all {
-                let remaining = store.monthlyBudget - spend
-                if remaining >= 0 {
-                    HStack(spacing: 6) {
-                        Image(systemName: "gauge.with.dots.needle.33percent")
-                            .foregroundStyle(Theme.emerald)
-                        Text("\(CurrencyFormat.string(remaining, fraction: false)) kaldı · günde \(CurrencyFormat.string(dailyAllowance(remaining), fraction: false))")
-                    }
-                } else {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(Theme.coral)
-                        Text("Bütçe \(CurrencyFormat.string(-remaining, fraction: false)) aşıldı")
-                            .foregroundStyle(Theme.coral)
-                    }
-                }
-            } else {
-                let all = Ledger.spending(Ledger.inMonth(store.expenses))
-                let share = all > 0 ? (spend / all).doubleValue : 0
+    private func budgetCaption(spend: Decimal, allSpend: Decimal, budget: Decimal, incomeDriven: Bool) -> some View {
+        let remaining = budget - spend
+        let pool = incomeDriven ? "Gelirden " : ""
+
+        return Group {
+            if filter != .all {
+                let share = allSpend > 0 ? (spend / allSpend).doubleValue : 0
                 HStack(spacing: 6) {
                     Image(systemName: "line.3.horizontal.decrease.circle.fill")
                         .foregroundStyle(Theme.ocean)
                     Text("Bu ayki harcamanın %\(Int((share * 100).rounded()))’i bu havuzda")
+                }
+            } else if isFutureMonth {
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar.badge.clock")
+                        .foregroundStyle(Theme.ocean)
+                    Text("Taksit ve aboneliklerden tahmini yük")
+                }
+            } else if remaining < 0 {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Theme.coral)
+                    Text("\(incomeDriven ? "Gelir" : "Bütçe") \(CurrencyFormat.string(-remaining, fraction: false)) aşıldı")
+                        .foregroundStyle(Theme.coral)
+                }
+            } else if isCurrentMonth {
+                HStack(spacing: 6) {
+                    Image(systemName: incomeDriven ? "arrow.down.left.circle.fill" : "gauge.with.dots.needle.33percent")
+                        .foregroundStyle(Theme.emerald)
+                    Text("\(pool)\(CurrencyFormat.string(remaining, fraction: false)) kaldı · günde \(CurrencyFormat.string(dailyAllowance(remaining), fraction: false))")
+                }
+            } else {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Theme.emerald)
+                    Text("Ay kapandı · \(pool.lowercased(with: KurusDate.locale))\(CurrencyFormat.string(remaining, fraction: false)) arttı")
                 }
             }
         }

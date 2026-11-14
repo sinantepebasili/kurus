@@ -51,6 +51,9 @@ struct AddExpenseIntent: AppIntent {
         if let installment = first.installment {
             message = "\(first.title) · \(installment.count) taksit × \(CurrencyFormat.string(first.amount)) kaydedildi."
         }
+        if first.category.isIncome {
+            message = "\(first.title) · +\(CurrencyFormat.string(first.amount)) gelir olarak kaydedildi."
+        }
 
         return .result(
             dialog: IntentDialog(stringLiteral: message),
@@ -58,7 +61,7 @@ struct AddExpenseIntent: AppIntent {
                 expense: first,
                 card: card,
                 monthSpend: monthSpend,
-                budget: store.monthlyBudget
+                budget: Ledger.effectiveBudget(Ledger.inMonth(store.expenses), manual: store.monthlyBudget)
             )
         )
     }
@@ -117,7 +120,13 @@ struct ExpenseSnippetView: View {
                     .foregroundStyle(Theme.emerald)
             }
 
-            AmountText(amount: expense.amount, size: 34, weight: .bold)
+            AmountText(
+                amount: expense.amount,
+                size: 34,
+                weight: .bold,
+                color: expense.category.isIncome ? Theme.emerald : Theme.textPrimary,
+                prefix: expense.category.isIncome ? "+" : ""
+            )
 
             VStack(alignment: .leading, spacing: 6) {
                 CapsuleMeter(progress: progress, tint: progress > 1 ? Theme.coral : Theme.emerald)

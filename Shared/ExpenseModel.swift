@@ -11,8 +11,8 @@ import SwiftUI
 // MARK: - Kategori
 
 enum ExpenseCategory: String, Codable, CaseIterable, Identifiable, Sendable {
-    case food, coffee, market, transport, shopping, bills, subscription
-    case entertainment, health, travel, education, savings, other
+    case food, coffee, market, transport, shopping, technology, bills, subscription
+    case entertainment, health, travel, education, savings, income, other
 
     var id: String { rawValue }
 
@@ -23,6 +23,7 @@ enum ExpenseCategory: String, Codable, CaseIterable, Identifiable, Sendable {
         case .market: "Market"
         case .transport: "Ulaşım"
         case .shopping: "Alışveriş"
+        case .technology: "Teknoloji"
         case .bills: "Fatura"
         case .subscription: "Abonelik"
         case .entertainment: "Eğlence"
@@ -30,6 +31,7 @@ enum ExpenseCategory: String, Codable, CaseIterable, Identifiable, Sendable {
         case .travel: "Seyahat"
         case .education: "Eğitim"
         case .savings: "Birikim"
+        case .income: "Gelir"
         case .other: "Diğer"
         }
     }
@@ -41,6 +43,7 @@ enum ExpenseCategory: String, Codable, CaseIterable, Identifiable, Sendable {
         case .market: "cart.fill"
         case .transport: "car.fill"
         case .shopping: "bag.fill"
+        case .technology: "desktopcomputer"
         case .bills: "bolt.fill"
         case .subscription: "repeat"
         case .entertainment: "popcorn.fill"
@@ -48,6 +51,7 @@ enum ExpenseCategory: String, Codable, CaseIterable, Identifiable, Sendable {
         case .travel: "airplane"
         case .education: "book.fill"
         case .savings: "chart.line.uptrend.xyaxis"
+        case .income: "arrow.down.left.circle.fill"
         case .other: "square.grid.2x2.fill"
         }
     }
@@ -59,12 +63,20 @@ enum ExpenseCategory: String, Codable, CaseIterable, Identifiable, Sendable {
         case .transport, .travel, .education: Theme.ocean
         case .shopping, .entertainment, .health: Theme.coral
         case .subscription, .savings: Theme.violet
+        case .technology: Theme.indigo
+        case .income: Theme.emerald
         case .other: Theme.textSecondary
         }
     }
 
     /// Birikim / Yatırım "gerçek harcama" toplamına girmez.
     var isSavings: Bool { self == .savings }
+
+    /// Gelir (maaş, iade, prim…) harcama toplamına girmez; bütçe havuzunu büyütür.
+    var isIncome: Bool { self == .income }
+
+    /// Gerçek harcama = birikim ve gelir dışındaki her şey.
+    var countsAsSpending: Bool { !isSavings && !isIncome }
 }
 
 // MARK: - Kart
@@ -214,11 +226,89 @@ enum Ledger {
     }
 
     static func spending(_ expenses: [Expense]) -> Decimal {
-        sum(expenses.filter { !$0.category.isSavings })
+        sum(expenses.filter { $0.category.countsAsSpending })
     }
 
     static func savings(_ expenses: [Expense]) -> Decimal {
         sum(expenses.filter { $0.category.isSavings })
+    }
+
+    static func income(_ expenses: [Expense]) -> Decimal {
+        sum(expenses.filter { $0.category.isIncome })
+    }
+
+    /// O ay en az bir gelir girildiyse bütçe havuzu = o ayın toplam geliri; yoksa manuel hedef.
+    static func effectiveBudget(_ monthEntries: [Expense], manual: Decimal) -> Decimal {
+        let earned = income(monthEntries)
+        return earned > 0 ? earned : manual
+    }
+
+    // MARK: Ay gezintisi
+
+    static func startOfMonth(_ date: Date) -> Date {
+        let cal = calendar
+        return cal.date(from: cal.dateComponents([.year, .month], from: date)) ?? date
+    }
+
+    static func isCurrentMonth(_ month: Date, now: Date = .now) -> Bool {
+        startOfMonth(month) == startOfMonth(now)
+    }
+
+    static func isFutureMonth(_ month: Date, now: Date = .now) -> Bool {
+        startOfMonth(month) > startOfMonth(now)
+    }
+
+    /// Bir ayın kayıtları. Gelecek aylarda kayıtlı taksitlerin yanında tekrarlayan
+    /// aboneliklerin (ve maaş gibi düzenli gelirlerin) tahmini kopyaları da döner.
+    /// Tahminler kalıcı değildir; `projectedIDs` ile işaretlenir.
+    static func monthEntries(in s: KurusSnapshot, month: Date, now: Date = .now) -> (items: [Expense], projectedIDs: Set<UUID>) {
+        let real = inMonth(s.expenses, of: month)
+        guard isFutureMonth(month, now: now) else { return (real, []) }
+        let projected = projectedRecurring(in: s, month: month, existing: real, now: now)
+        return (real + projected, Set(projected.map(\.id)))
+    }
+
+    static func projectedRecurring(in s: KurusSnapshot, month: Date, existing: [Expense], now: Date = .now) -> [Expense] {
+        let cal = calendar
+        let existingKeys = Set(existing.map { recurringKey($0) })
+        let monthStart = startOfMonth(month)
+        let daysInMonth = cal.range(of: .day, in: .month, for: monthStart)?.count ?? 28
+
+        return latestRecurring(in: s, now: now).compactMap { source in
+            guard !existingKeys.contains(recurringKey(source)) else { return nil }
+            var comps = cal.dateComponents([.year, .month], from: monthStart)
+            let original = cal.dateComponents([.day, .hour, .minute], from: source.date)
+            comps.day = min(original.day ?? 1, daysInMonth)
+            comps.hour = original.hour
+            comps.minute = original.minute
+            guard let date = cal.date(from: comps) else { return nil }
+            return Expense(
+                id: projectedID(for: source.id, month: monthStart),
+                title: source.title,
+                amount: source.amount,
+                date: date,
+                category: source.category,
+                brandID: source.brandID,
+                cardID: source.cardID,
+                isRecurring: true,
+                isDemo: source.isDemo,
+                note: source.note
+            )
+        }
+    }
+
+    private static func recurringKey(_ e: Expense) -> String {
+        e.brandID ?? e.title.kurusNormalized
+    }
+
+    /// Kaynak kimlik + ay → kararlı (her çizimde aynı) tahmin kimliği.
+    private static func projectedID(for source: UUID, month: Date) -> UUID {
+        let comps = calendar.dateComponents([.year, .month], from: month)
+        var bytes = source.uuid
+        bytes.13 ^= 0xA5
+        bytes.14 = UInt8(truncatingIfNeeded: comps.year ?? 0)
+        bytes.15 = UInt8(truncatingIfNeeded: comps.month ?? 0)
+        return UUID(uuid: bytes)
     }
 
     /// Birikim / (Harcama + Birikim)
@@ -260,7 +350,7 @@ enum Ledger {
     /// Son tekrarlayan gider kayıtları (marka ya da başlığa göre en yenisi).
     private static func latestRecurring(in s: KurusSnapshot, now: Date) -> [Expense] {
         let recurring = s.expenses.filter { $0.isRecurring && $0.installment == nil && $0.date <= now }
-        return Dictionary(grouping: recurring) { $0.brandID ?? $0.title.kurusNormalized }
+        return Dictionary(grouping: recurring) { recurringKey($0) }
             .compactMap { $0.value.max { $0.date < $1.date } }
     }
 
@@ -288,7 +378,7 @@ enum Ledger {
         }
 
         // 2) Abonelik yenilemeleri
-        for e in latestRecurring(in: s, now: now) {
+        for e in latestRecurring(in: s, now: now) where !e.category.isIncome {
             guard let next = cal.date(byAdding: .month, value: 1, to: e.date), next > now, next <= horizon else { continue }
             items.append(UpcomingPayment(
                 id: "sub-\(e.id.uuidString)",
@@ -307,7 +397,7 @@ enum Ledger {
             guard let day = card.statementDay,
                   let next = nextOccurrence(day: day, onOrAfter: now),
                   let previous = cal.date(byAdding: .month, value: -1, to: next) else { continue }
-            let due = sum(s.expenses.filter { $0.cardID == card.id && $0.date > previous && $0.date <= now })
+            let due = sum(s.expenses.filter { $0.cardID == card.id && $0.category.countsAsSpending && $0.date > previous && $0.date <= now })
             items.append(UpcomingPayment(
                 id: "stmt-\(card.id)",
                 title: card.pillTitle,
@@ -323,14 +413,14 @@ enum Ledger {
         return items.sorted { $0.date < $1.date }
     }
 
-    /// Gelecek ayların yükü: o aya düşen taksitler + aylık tekrarlayan giderler.
+    /// Gelecek ayların yükü: o aya düşen taksitler + aylık tekrarlayan giderler (gelirler hariç).
     static func load(monthOffset: Int, in s: KurusSnapshot, now: Date = .now) -> Decimal {
         let cal = calendar
         guard let target = cal.date(byAdding: .month, value: monthOffset, to: now) else { return 0 }
-        let scheduled = sum(s.expenses.filter {
+        let scheduled = spending(s.expenses.filter {
             $0.date > now && cal.isDate($0.date, equalTo: target, toGranularity: .month)
         })
-        let recurring = sum(latestRecurring(in: s, now: now))
+        let recurring = spending(latestRecurring(in: s, now: now))
         return scheduled + recurring
     }
 }

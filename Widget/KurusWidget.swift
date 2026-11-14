@@ -36,7 +36,7 @@ struct KurusEntry: TimelineEntry {
             date: date,
             monthTotal: Ledger.spending(month),
             todayTotal: Ledger.spendingOnDay(snapshot.expenses, day: date),
-            budget: snapshot.monthlyBudget,
+            budget: Ledger.effectiveBudget(month, manual: snapshot.monthlyBudget),
             savingsShare: Ledger.savingsShare(month),
             week: Ledger.dailyTotals(snapshot.expenses, days: 7, endingAt: date)
         )

@@ -219,7 +219,7 @@ struct StatementPDFView: View {
     }
 
     private func categoryBreakdown(spend: Decimal) -> some View {
-        let groups = Dictionary(grouping: expenses.filter { !$0.category.isSavings }, by: \.category)
+        let groups = Dictionary(grouping: expenses.filter { $0.category.countsAsSpending }, by: \.category)
             .map { (category: $0.key, total: Ledger.sum($0.value)) }
             .sorted { $0.total > $1.total }
             .prefix(4)
@@ -293,7 +293,13 @@ struct StatementPDFView: View {
                 .frame(width: 84, alignment: .leading)
                 .foregroundStyle(sub)
                 .monospacedDigit()
-            AmountText(amount: e.amount, size: 10, weight: .semibold, color: e.category.isSavings ? Theme.violet : ink)
+            AmountText(
+                amount: e.amount,
+                size: 10,
+                weight: .semibold,
+                color: e.category.isIncome ? Theme.emerald : (e.category.isSavings ? Theme.violet : ink),
+                prefix: e.category.isIncome ? "+" : ""
+            )
                 .frame(width: 80, alignment: .trailing)
         }
         .font(.system(size: 10, weight: .medium))

@@ -22,6 +22,8 @@ Kurus/
 │   ├── SmartInputBarView.swift
 │   ├── AutomationGuideSheet.swift
 │   ├── ExportManager.swift
+│   ├── BrandLogoView.swift           Marka işareti, sol üst başlık, ikon dışa aktarıcısı
+│   ├── CategoryBreakdownSheet.swift  % rozetinden açılan halka grafik analizi
 │   ├── Assets.xcassets               AppIcon, AccentColor, LaunchBackground
 │   ├── Info.plist                    kurus:// URL şeması, karanlık açılış ekranı
 │   ├── Kurus.entitlements            App Group + iCloud KVS
@@ -114,6 +116,17 @@ Otomatik imzalama (*Automatically manage signing*) açıkken Xcode aşağıdakil
 - **Deep link:** Simülatörde `xcrun simctl openurl booted kurus://quick-add` giriş çubuğunu odaklar.
 - **Siri / Kestirmeler:** “Kuruş ile harcama ekle”. SMS otomasyonu kurulumu uygulama içindeki *Banka SMS Otomasyonu Rehberi*'nde anlatılıyor.
 - **iCloud eşitlemesi:** Simülatörde iCloud hesabıyla oturum açın. KVS eşitlemesi gecikmeli olabilir; en güvenilir test iki gerçek cihazla yapılır.
+
+## Kullanım notları
+
+- **Gelir:** Giriş çubuğuna başında `+` ile (`+Maaş 65000`, `İade +450`) ya da *maaş, gelir, iade, prim, ikramiye, kira geliri* kelimeleriyle yazın.
+  - Gelir zümrüt yeşili `+₺` olarak listelenir ve harcama toplamına eklenmez.
+  - O ay gelir varsa özet kartındaki limit (`/ ₺…`) o ayın toplam geliri olur; yoksa manuel bütçe gösterilir.
+  - `Disney+ 349` gibi harfe yapışık `+` gelir sayılmaz.
+- **Ay geçişi:** Özet kartındaki `‹ ›` okları önceki aylara (kayıtlı ilk aya kadar) ve 12 ay ileriye gider. Ay başlığına dokunmak bu aya döndürür.
+  - Gelecek aylarda kayıtlı taksitler ve tekrarlayan aboneliklerin **tahmini** kopyaları görünür. Tahminler kaydedilmez; silinemez ve düzenlenemez.
+- **Kategori analizi:** Özet kartının sağ üstündeki `%` rozeti, seçili ay ve kart filtresi için halka grafiği açar. Birikim ve gelir bu analize dahil değildir.
+- **Uygulama ikonu:** `AppIcon-1024.png`, `KurusAppIconExporter` geometrisinin Python ile çizilmiş bir kopyasıdır. Birebir SwiftUI çıktısı için Xcode'da `BrandLogoView.swift` içindeki “Uygulama ikonu” önizlemesini 1024×1024 dışa aktarıp bu dosyayla değiştirin.
 
 ## Doğrulama durumu
 
