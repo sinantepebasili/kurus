@@ -26,22 +26,34 @@ struct PaywallView: View {
     @Environment(\.openURL) private var openURL
 
     @State private var selected: StoreManager.Plan = .lifetime
+    /// Kısa ekran (iPhone SE): özellik satırları ve üst boşluk biraz daha sıkılaşır
+    @State private var isCompactHeight = false
 
     private var brand: String { AppLanguage.brandName }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 26) {
+            // Kompakt kompozisyon: iPhone 13–16'da logo, 4 özellik, 3 plan ve "Devam Et" kaydırmadan görünür.
+            // Yalnızca SE gibi çok küçük ekranlarda ScrollView devreye girer.
+            VStack(spacing: 12) {
                 header
                 powers
                 planPicker
                 legalNote
             }
             .padding(.horizontal, Theme.gutter)
-            .padding(.top, 28)
-            .padding(.bottom, 12)
+            .padding(.top, isCompactHeight ? 12 : 18)
+            .padding(.bottom, 8)
         }
         .scrollIndicators(.hidden)
+        .scrollBounceBehavior(.basedOnSize)
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { isCompactHeight = proxy.size.height < 700 }
+                    .onChange(of: proxy.size.height) { _, height in isCompactHeight = height < 700 }
+            }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) { footer }
         .overlay(alignment: .topTrailing) { closeButton }
         .background(Theme.background)
@@ -61,14 +73,14 @@ struct PaywallView: View {
     // MARK: - Üst bölüm
 
     private var header: some View {
-        VStack(spacing: 12) {
-            KurusMarkShape(size: 36)
-                .padding(10)
+        VStack(spacing: 6) {
+            KurusMarkShape(size: 28)
+                .padding(7)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
 
             Text("\(brand) Pro")
-                .font(.system(size: 30, weight: .bold, design: .rounded))
+                .font(.system(size: 26, weight: .bold, design: .rounded))
                 .tracking(-0.6)
                 .foregroundStyle(Theme.textPrimary)
 
@@ -76,11 +88,11 @@ struct PaywallView: View {
                 "Otomatik SMS yakalama, taksit takibi ve interaktif widget’larla tam kontrol.",
                 "Full control with automatic SMS capture, installment tracking and interactive widgets."
             ))
-            .font(.system(size: 15))
+            .font(.system(size: 14))
             .foregroundStyle(Theme.textSecondary)
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 8)
         }
         .frame(maxWidth: .infinity)
     }
@@ -106,17 +118,17 @@ struct PaywallView: View {
         return VStack(spacing: 0) {
             ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                 if index > 0 {
-                    Rectangle().fill(Theme.hairline).frame(height: 1).padding(.leading, 52)
+                    Rectangle().fill(Theme.hairline).frame(height: 1).padding(.leading, 40)
                 }
                 let highlighted = feature.highlightIndex == index
-                HStack(spacing: 14) {
+                HStack(spacing: 12) {
                     Image(systemName: row.symbol)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(row.tint)
-                        .frame(width: 32, height: 32)
-                        .background(row.tint.opacity(0.16), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .frame(width: 28, height: 28)
+                        .background(row.tint.opacity(0.16), in: RoundedRectangle(cornerRadius: 8.5, style: .continuous))
                     Text(row.text)
-                        .font(.system(size: 14.5, weight: highlighted ? .semibold : .medium))
+                        .font(.system(size: 13.5, weight: highlighted ? .semibold : .medium))
                         .foregroundStyle(highlighted ? Theme.textPrimary : Theme.textPrimary.opacity(0.85))
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
@@ -126,11 +138,11 @@ struct PaywallView: View {
                             .foregroundStyle(Theme.emerald)
                     }
                 }
-                .padding(.vertical, 11)
+                .padding(.vertical, isCompactHeight ? 6 : 8)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 3)
         .craftCard(radius: 18)
     }
 
@@ -140,7 +152,7 @@ struct PaywallView: View {
         VStack(spacing: 0) {
             ForEach(Array(StoreManager.Plan.allCases.enumerated()), id: \.element.id) { index, plan in
                 if index > 0 {
-                    Rectangle().fill(Theme.hairline).frame(height: 1).padding(.leading, 48)
+                    Rectangle().fill(Theme.hairline).frame(height: 1).padding(.leading, 45)
                 }
                 planRow(plan)
             }
@@ -155,14 +167,14 @@ struct PaywallView: View {
             withAnimation(Theme.spring) { selected = plan }
             Haptics.selection()
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 20, weight: .regular))
                     .foregroundStyle(isSelected ? Theme.emerald : Theme.textMuted)
                     .contentTransition(.symbolEffect(.replace))
                     .frame(width: 24)
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(title(for: plan))
                             .font(.system(size: 16, weight: .semibold))
@@ -199,8 +211,8 @@ struct PaywallView: View {
                 .minimumScaleFactor(0.75)
                 .fixedSize()
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 14)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 11)
             .background(isSelected ? Theme.elevated.opacity(0.6) : Color.clear)
             .contentShape(Rectangle())
         }
@@ -266,7 +278,7 @@ struct PaywallView: View {
     // MARK: - Alt bölüm
 
     private var footer: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             if let error = store.lastError {
                 Text(error)
                     .font(.system(size: 12.5, weight: .medium))
@@ -292,7 +304,7 @@ struct PaywallView: View {
                 }
                 .foregroundStyle(Theme.background)
                 .frame(maxWidth: .infinity)
-                .frame(height: 54)
+                .frame(height: 50)
                 .background(Theme.textPrimary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
             .buttonStyle(SpringPressStyle())
@@ -317,7 +329,7 @@ struct PaywallView: View {
             .minimumScaleFactor(0.7)
         }
         .padding(.horizontal, Theme.gutter)
-        .padding(.top, 12)
+        .padding(.top, 10)
         .padding(.bottom, 8)
         .background(Theme.background)
         .animation(Theme.spring, value: store.lastError)
