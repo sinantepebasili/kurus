@@ -15,6 +15,8 @@ struct SmartInputBarView: View {
     var lockedFeature: (ParsedExpense) -> ProFeature? = { _ in nil }
     /// Her başarılı kayıtta artar; TextField yeniden oluşturulur ve ekrandaki metin kesin olarak temizlenir.
     var resetToken: Int = 0
+    /// Kullanıcının kart adları (Ayarlar → Kart Ekle): "Kahve 85 nkolay" → Nkolay kartı
+    var cardNames: [String] = []
     var onSubmit: (ParsedExpense) -> Void
 
     @State private var shakes: CGFloat = 0
@@ -26,7 +28,7 @@ struct SmartInputBarView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        let parsed = ExpenseParser.parse(text)
+        let parsed = ExpenseParser.parse(text, userCards: cardNames)
         let isValid = parsed?.isValid ?? false
 
         VStack(spacing: 10) {
@@ -134,7 +136,7 @@ struct SmartInputBarView: View {
         .animation(Theme.spring, value: parsed != nil)
         .onChange(of: text) { _, newText in
             // Kullanıcı tutarı ekleyince uyarı hemen kalkar
-            if amountHint != nil, ExpenseParser.parse(newText)?.isValid == true {
+            if amountHint != nil, ExpenseParser.parse(newText, userCards: cardNames)?.isValid == true {
                 hintTask?.cancel()
                 withAnimation(Theme.spring) { amountHint = nil }
             }
@@ -155,7 +157,7 @@ struct SmartInputBarView: View {
     }
 
     private func submit() {
-        guard let parsed = ExpenseParser.parse(text), parsed.isValid else {
+        guard let parsed = ExpenseParser.parse(text, userCards: cardNames), parsed.isValid else {
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
             // Metin korunur; kullanıcı yalnızca sayıyı ekleyebilir
             Haptics.warning()
@@ -243,7 +245,8 @@ struct LiveParsePill: View {
                     tint: Theme.ocean
                 )
             }
-            if parsed.isRecurring {
+            // Abonelik kategorisi zaten "repeat" simgesiyle görünür; ikinci döngü simgesi gösterilmez.
+            if parsed.isRecurring && parsed.category != .subscription {
                 ParseTag(symbol: "repeat", text: compact ? nil : (parsed.isIncome ? L("Aylık", "Monthly") : L("Abonelik", "Subscription")), tint: Theme.violet)
             }
         }

@@ -145,7 +145,8 @@ struct ContentView: View {
                 isFocused: $inputFocused,
                 isDemoTyping: isDemoTyping,
                 lockedFeature: lockedFeature(for:),
-                resetToken: inputResetToken
+                resetToken: inputResetToken,
+                cardNames: store.userCardNames
             ) { parsed in
                 commit(parsed, isDemo: false)
             }
@@ -517,7 +518,7 @@ struct ContentView: View {
                     }
                 }
                 try? await Task.sleep(for: .milliseconds(500))
-                guard !Task.isCancelled, let parsed = ExpenseParser.parse(inputText) else { return }
+                guard !Task.isCancelled, let parsed = ExpenseParser.parse(inputText, userCards: store.userCardNames) else { return }
                 commit(parsed, isDemo: true)
                 Haptics.tap()
                 try? await Task.sleep(for: .milliseconds(700))

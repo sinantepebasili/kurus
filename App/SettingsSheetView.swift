@@ -25,6 +25,7 @@ struct SettingsSheetView: View {
     @State private var didReset = false
     @State private var editingCard: CardEditTarget?
     @State private var pendingDelete: PaymentCard?
+    @State private var showAddCard = false
 
     private var brand: String { AppLanguage.brandName }
 
@@ -70,6 +71,11 @@ struct SettingsSheetView: View {
             PaywallView(feature: .general)
                 .environment(storeManager)
                 .environment(store)
+        }
+        .sheet(isPresented: $showAddCard) {
+            AddCardSheet()
+                .environment(store)
+                .environment(storeManager)
         }
         .sheet(item: $editingCard) { target in
             CardEditorSheet(cardID: target.id)
@@ -233,12 +239,14 @@ struct SettingsSheetView: View {
         let tips: [(command: String, meaning: String)] = AppLanguage.isTurkish
             ? [
                 ("Kahve 85", "Tutar ve başlık; kategori ile marka kendiliğinden"),
+                ("Kahve 85 bonus", "Kart adı her zaman tutardan sonra yazılır"),
                 ("+Maaş 65000", "Başta + ile gelir; o ayın bütçesi olur"),
                 ("Market 450 dün", "“dün” yazınca dünün tarihiyle kaydedilir"),
                 ("Telefon 36000 3t", "Taksitler gelecek aylara bölünür (Pro)"),
             ]
             : [
                 ("Coffee 5", "Amount and title; category and brand are detected"),
+                ("Coffee 5 chase", "The card name always goes after the amount"),
                 ("+Salary 5000", "A leading + logs income; it becomes the month’s budget"),
                 ("Lunch 12 yesterday", "“yesterday” logs it with yesterday’s date"),
                 ("Laptop 1200 3x", "Installments are spread over the coming months (Pro)"),
@@ -311,8 +319,8 @@ struct SettingsSheetView: View {
             // Kayıtlı kartlar
             VStack(spacing: 0) {
                 if store.cards.isEmpty {
-                    Text(L("Henüz kart yok. Banka SMS’i ya da “Kahve 85 bonus” gibi bir girişle kendiliğinden eklenir.",
-                           "No cards yet. They’re added automatically from a bank SMS or an entry like “Coffee 5 chase”."))
+                    Text(L("Henüz kart yok. Banka SMS’i ya da “Kahve 85 bonus” gibi bir girişle kendiliğinden eklenir; listede olmayan kartını aşağıdan ekleyebilirsin.",
+                           "No cards yet. They’re added automatically from a bank SMS or an entry like “Coffee 5 chase”; add a card that isn’t recognized below."))
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.textSecondary)
                         .padding(14)
@@ -329,6 +337,30 @@ struct SettingsSheetView: View {
             .craftCard(radius: 16)
             // Ayrı görünümde: sayfadaki "Tüm Verileri Sıfırla" onayıyla çakışmasın
             .cardDeletionDialog(card: $pendingDelete)
+
+            // Listede olmayan banka / kart (ör. Nkolay): adı ayrıştırıcının kart sözlüğüne girer.
+            Button {
+                showAddCard = true
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text(L("Kart Ekle", "Add Card"))
+                        .font(.system(size: 15, weight: .semibold))
+                    Spacer(minLength: 0)
+                    if !storeManager.isPro && store.realCardCount >= ProStatus.freeCardLimit {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.textMuted)
+                            .accessibilityLabel("Pro")
+                    }
+                }
+                .foregroundStyle(Theme.emerald)
+                .padding(.horizontal, 16)
+                .frame(height: 50)
+                .craftCard(radius: 16)
+            }
+            .buttonStyle(.plain)
 
             Button(role: .destructive) {
                 confirmReset = true
@@ -487,5 +519,160 @@ struct SettingsSheetView: View {
         .frame(height: 46)
         .background(Theme.emerald.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.emerald.opacity(0.25), lineWidth: 1))
+    }
+}
+
+// MARK: - Kart Ekle
+
+/// Ayarlar → "Kart Ekle". Banka sözlüğünde olmayan kartlar ("Nkolay") için: verilen ad,
+/// tutardan sonra yazılınca bu karta bağlanır ("Kahve 85 Nkolay").
+struct AddCardSheet: View {
+    @Environment(SharedExpenseStore.self) private var store
+    @Environment(StoreManager.self) private var storeManager
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var name = ""
+    @State private var last4 = ""
+    @State private var errorText: String?
+    @State private var showPaywall = false
+    @FocusState private var focusedField: Field?
+
+    private enum Field { case name, last4 }
+
+    private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var exampleName: String { trimmedName.isEmpty ? "Nkolay" : trimmedName }
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 14) {
+                field(
+                    title: L("KART ADI", "CARD NAME"),
+                    prompt: L("Örn. Nkolay", "e.g. Chime"),
+                    text: $name,
+                    focus: .name
+                )
+                .onChange(of: name) { _, newValue in
+                    errorText = nil
+                    if newValue.count > 24 { name = String(newValue.prefix(24)) }
+                }
+
+                field(
+                    title: L("SON 4 HANE (İSTEĞE BAĞLI)", "LAST 4 DIGITS (OPTIONAL)"),
+                    prompt: "1234",
+                    text: $last4,
+                    focus: .last4,
+                    keyboard: .numberPad
+                )
+                .onChange(of: last4) { _, newValue in
+                    errorText = nil
+                    let digits = String(newValue.filter { $0.isASCII && $0.isNumber }.prefix(4))
+                    if digits != newValue { last4 = digits }
+                }
+
+                if let errorText {
+                    Label(errorText, systemImage: "exclamationmark.circle.fill")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Theme.amber)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .transition(.opacity)
+                }
+
+                // Kısa ve ayırt edici ad; harcamanın SONUNA yazılır (Heuristic #10)
+                Text(L(
+                    "Kısa ve ayırt edici bir ad ver. Harcamanın sonuna yazınca bu karta kaydedilir: “Kahve 85 \(exampleName)”. Son 4 hane, banka SMS’lerini de bu karta bağlar.",
+                    "Use a short, distinctive name. Type it after the amount to log to this card: “Coffee 5 \(exampleName)”. The last 4 digits also match bank notifications to this card."
+                ))
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer(minLength: 0)
+            }
+            .padding(Theme.gutter)
+            .background(Theme.surface)
+            .navigationTitle(L("Kart Ekle", "Add Card"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Theme.surface, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(L("Vazgeç", "Cancel")) { dismiss() }
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(L("Ekle", "Add"), action: save)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.emerald)
+                        .disabled(trimmedName.count < 2)
+                }
+            }
+        }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView(feature: .multipleCards)
+                .environment(storeManager)
+                .environment(store)
+        }
+        .presentationDetents([.height(400)])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Theme.surface)
+        .presentationCornerRadius(28)
+        .onAppear { focusedField = .name }
+    }
+
+    private func field(title: String, prompt: String, text: Binding<String>, focus: Field,
+                       keyboard: UIKeyboardType = .default) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .tracking(0.6)
+                .foregroundStyle(Theme.textSecondary)
+            TextField(text: text, prompt: Text(prompt).foregroundStyle(Theme.textMuted)) {
+                Text(title)
+            }
+            .font(.system(size: 16, weight: .medium))
+            .monospacedDigit()
+            .foregroundStyle(Theme.textPrimary)
+            .tint(Theme.emerald)
+            .autocorrectionDisabled()
+            .keyboardType(keyboard)
+            .focused($focusedField, equals: focus)
+            .submitLabel(focus == .name ? .next : .done)
+            .onSubmit {
+                if focus == .name { focusedField = .last4 } else { save() }
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 44)
+            .background(Theme.elevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
+        }
+    }
+
+    private func save() {
+        let allowNew = storeManager.isPro || store.realCardCount < ProStatus.freeCardLimit
+        let result = withAnimation(Theme.spring) {
+            store.addCard(name: name, last4: last4.isEmpty ? nil : last4, allowNewCard: allowNew)
+        }
+        switch result {
+        case .success:
+            Haptics.success()
+            dismiss()
+        case .failure(let error):
+            Haptics.warning()
+            withAnimation(Theme.spring) {
+                switch error {
+                case .invalidName:
+                    errorText = L("En az 2 harfli, “Kart” ya da “Nakit” dışında bir ad yaz.",
+                                  "Enter a name with at least 2 letters, other than “Card” or “Cash”.")
+                case .invalidLast4:
+                    errorText = L("Son 4 hane tam 4 rakam olmalı ya da boş kalmalı.",
+                                  "The last 4 digits must be exactly 4 numbers, or left empty.")
+                case .duplicate:
+                    errorText = L("Bu kart zaten kayıtlı.", "This card is already saved.")
+                case .limitReached:
+                    errorText = nil
+                    focusedField = nil
+                    showPaywall = true
+                }
+            }
+        }
     }
 }

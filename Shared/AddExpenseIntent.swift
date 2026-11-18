@@ -42,11 +42,11 @@ struct AddExpenseIntent: AppIntent {
         guard ProStatus.isPro else {
             throw KurusIntentError.proRequired
         }
-        guard let parsed = ExpenseParser.parse(text), parsed.isValid else {
+        let store = SharedExpenseStore.shared
+        guard let parsed = ExpenseParser.parse(text, userCards: store.userCardNames), parsed.isValid else {
             throw KurusIntentError.amountNotFound
         }
 
-        let store = SharedExpenseStore.shared
         let created = store.add(parsed)
         guard let first = created.first else { throw KurusIntentError.amountNotFound }
 

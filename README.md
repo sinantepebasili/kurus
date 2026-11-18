@@ -47,14 +47,22 @@ Satın alma Apple'ın yerel **StoreKit 2** çerçevesiyle yapılır; 3. parti k�
   - Onay sorduktan sonra harcamaları, kartları ve bütçeyi bu cihazdan ve iCloud'dan siler (`SharedExpenseStore.resetAllData()`).
   - Uygulama SwiftData kullanmıyor; veri App Group `UserDefaults` + iCloud anahtar-değer deposunda tek bir `KurusSnapshot` olarak tutuluyor. Boş anlık görüntü en yeni zaman damgasıyla yazıldığı için iCloud'a bağlı diğer cihazlar da boşalır.
   - Pro satın alımı Apple'da olduğu için etkilenmez.
-- **Nasıl Kullanılır?:** Dört örnek komut.
+- **Nasıl Kullanılır?:** Beş örnek komut (kart adının tutardan sonra yazıldığı `Kahve 85 bonus` dahil).
 - **iCloud & Veri Yönetimi:**
   - iCloud durumu (`ubiquityIdentityToken`).
   - Kayıtlı kartlar: dokununca düzenleme, çöp kutusuyla silme.
+  - **Kart Ekle:** listede olmayan banka / kart (ör. Nkolay) için ad + isteğe bağlı son 4 hane. Ad, ayrıştırıcının kart sözlüğüne girer. Ücretsiz planda 1 kart sınırı aşılınca paywall açılır.
 - **Hakkında:** Gizlilik Politikası, Apple Standart EULA ve sürüm/build (`v1.0 (1)`).
 - **Pro ödemesini gider olarak ekleme:** Satın almadan sonra ya da Ayarlar'da bir kez, isteğe bağlı sunulur.
   - Aylık → tekrarlayan gider; Yaklaşan Ödemeler'de yenileme olarak görünür.
   - Yıllık / Ömür Boyu → bugüne tek seferlik harcama.
+
+**Kart ve banka tanıma:**
+- Banka / kart adı yalnızca **tutardan sonra** yazılınca karttır: `Yemek 300 bonus` → Bonus kartı; `Bonus 200`, `Wings 15`, `World Market 30` kart oluşturmaz.
+- İstisna: SMS / bildirim (son 4 hane, `işyeri`, `spent`, `card ending in`…) ya da kart bağlamı (`kartla`, `kartım`, `kartınızla`, `card`) varsa banka adı her yerde olabilir.
+- Türk bankaları ve kart programları + Finansbank (→ QNB), yabancı bankalar: Chase, Amex / American Express, Citi, Capital One, Discover, Bank of America, Wells Fargo, U.S. Bank, Apple Card, Barclays, HSBC, Lloyds, NatWest, Monzo, Revolut, N26, Wise, Santander, Deutsche Bank, BNP Paribas.
+- Kullanıcının kart adları (takma adlar ve sözlükte olmayan bankalar) aynı kuralla eşleşir: `Kahve 85 nkolay` → Nkolay kartı, başlık “Kahve”.
+- Bir gider sonradan Abonelik kategorisine alınırsa tekrarlayan olur (Yaklaşan Ödemeler'e girer); Abonelik'ten çıkarılırsa tekrarlayan olmaktan çıkar. Taksitler hariç.
 
 **Kart silme:**
 - Kart hapına ya da hesap kesimi kutusuna basılı tut › *Kartı Sil*, ya da Ayarlar'daki kart listesinden.

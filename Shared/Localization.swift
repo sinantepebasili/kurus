@@ -178,11 +178,11 @@ enum QuickSamples {
     /// İlk açılış demosu — "Aha!" anı: marka, kart, abonelik, taksit ve birikim dört girişte.
     /// (Widget çipleri `all` listesini kullanır; demo ondan bağımsızdır.)
     /// 1) Günlük harcama + marka  2) Karta bağlı abonelik  3) Kartla taksitli alışveriş  4) Birikim
-    /// İngilizcede "Chase" banka sözlüğünde olmadığı için kart adı yazılmaz.
+    /// Kart adı her zaman tutardan sonra yazılır ("Netflix 15 Chase").
     static var demoCommands: [String] {
         AppLanguage.isTurkish
             ? ["Migros 850", "Netflix 109 Yapı Kredi", "Apple 6000 3 taksit Yapı Kredi", "Altın 2000"]
-            : ["Whole Foods 85", "Netflix 15", "Apple 600 3x", "S&P 500 500"]
+            : ["Whole Foods 85", "Netflix 15 Chase", "Apple 600 3x Chase", "S&P 500 500"]
     }
 
     /// Giriş çubuğu ipucu (ilk görünen)

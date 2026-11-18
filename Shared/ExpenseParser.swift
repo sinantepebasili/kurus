@@ -17,6 +17,14 @@
 //   "Card ending in 4532 at Whole Foods for $84.50"
 //                                          → Whole Foods · $84.50 · ••4532 · Groceries
 //
+//  Kart / banka kuralı: banka ya da kart adı yalnızca TUTARDAN SONRA yazılınca karttır.
+//   "Yemek 300 bonus" → Bonus kartı · "Bonus 200" → başlık "Bonus", kart yok
+//   "Netflix 15 Chase" → Chase · "Wings 15" / "World Market 30" → kart yok
+//   İstisna: SMS / bildirim ya da kart bağlamı ("kartınızla", "kartla", "card", son 4 hane)
+//   varsa banka adı metnin herhangi bir yerinde olabilir.
+//   Kullanıcının Ayarlar'dan eklediği kart adları ("Nkolay") aynı kuralla eşleşir:
+//   "Kahve 85 nkolay" → Nkolay kartı, başlık "Kahve".
+//
 
 import Foundation
 
@@ -36,6 +44,8 @@ struct ParsedExpense: Equatable, Sendable {
     var brandID: String?
     var cardLast4: String?
     var bankName: String?
+    /// Kullanıcının kendi eklediği kart adıyla eşleşme ("Kahve 85 nkolay" → "Nkolay")
+    var userCardName: String?
     var isCash: Bool = false
     var isRecurring: Bool = false
     var isFromSMS: Bool = false
@@ -53,7 +63,7 @@ struct ParsedExpense: Equatable, Sendable {
 
     var cardLabel: String? {
         if isCash { return L("Nakit", "Cash") }
-        switch (bankName, cardLast4) {
+        switch (userCardName ?? bankName, cardLast4) {
         case let (bank?, last4?): return "\(bank) ••\(last4)"
         case let (bank?, nil): return bank
         case let (nil, last4?): return "\(L("Kart", "Card")) ••\(last4)"
@@ -71,7 +81,9 @@ struct ParsedExpense: Equatable, Sendable {
 
 enum ExpenseParser {
 
-    static func parse(_ input: String) -> ParsedExpense? {
+    /// - Parameter userCards: Kullanıcının kart adları (takma ad ya da banka adı). Tutardan sonra
+    ///   yazılınca karta bağlanır: "Kahve 85 nkolay" → userCardName "Nkolay".
+    static func parse(_ input: String, userCards: [String] = []) -> ParsedExpense? {
         let raw = input
             .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -115,8 +127,7 @@ enum ExpenseParser {
             )
         }
 
-        // 3) Banka / kart programı
-        result.bankName = Patterns.banks.first { norm.containsWord($0.keyword) }?.name
+        // 3) Banka / kart programı → 6b'de, tutarın konumu belli olduktan sonra.
 
         // 4) Nakit / cash
         result.isCash = norm.containsWord("nakit") || norm.containsWord("cash")
@@ -146,17 +157,21 @@ enum ExpenseParser {
             return Candidate(value: value, currency: tag?.code, range: tag?.range ?? m.whole)
         }
         let taggedDigits = candidates.first(where: { $0.currency != nil })
+        /// Tutarın `working` içindeki kelime sırası: bu sıradan SONRAKİ kelimeler "tutardan sonra"dır.
+        var amountTokenIndex: Int?
         let spoken = taggedDigits == nil ? extractSpokenAmount(from: working) : nil
 
         if let spoken, spoken.isTagged || candidates.isEmpty {
             result.amount = spoken.value
             result.currencyCode = spoken.currency
             working = spoken.cleaned
+            amountTokenIndex = spoken.tokenIndex
         } else if let chosen = taggedDigits ?? candidates.max(by: { $0.value < $1.value }) {
             result.amount = chosen.value
             if let code = chosen.currency, code != Money.homeCurrency {
                 result.currencyCode = code
             }
+            amountTokenIndex = working[..<chosen.range.lowerBound].split(whereSeparator: \.isWhitespace).count
             working.replaceSubrange(chosen.range, with: " ")
         }
 
@@ -168,8 +183,26 @@ enum ExpenseParser {
             || (result.cardLast4 != nil && !isTurkishSMS)
         result.isFromSMS = result.cardLast4 != nil || isTurkishSMS || isEnglishSMS
 
+        // 6b) Kart / banka: kullanıcının kart adları ve banka sözlüğü. Normalde yalnızca tutardan
+        //     SONRA ("Yemek 300 bonus"); SMS / bildirim ya da kart bağlamında her yerde.
+        let cardContext = result.isFromSMS
+            || SmartCategoryMatcher.matches(tokens: normTokens, keywords: Patterns.cardContextWords)
+        var brandNorm = norm
+        if !result.isCash,
+           let card = extractCard(from: working, userCards: userCards,
+                                  afterToken: amountTokenIndex, anywhere: cardContext) {
+            if card.isUserCard {
+                result.userCardName = card.name
+            } else {
+                result.bankName = card.name
+            }
+            working = card.cleaned
+            // "Coffee 5 Apple Card" → marka araması kart adını görmez (Apple markası sanılmaz).
+            brandNorm = removingLastPhrase(card.parts, from: norm)
+        }
+
         // 7) Marka
-        let brand = BrandEngine.detect(inNormalized: norm)
+        let brand = BrandEngine.detect(inNormalized: brandNorm)
         result.brandID = brand?.id
 
         // 8) Başlık
@@ -178,7 +211,7 @@ enum ExpenseParser {
             title = brand.name
         } else if isTurkishSMS {
             title = extractTurkishMerchant(from: raw)
-                ?? "\(result.bankName ?? "Kart") harcaması"
+                ?? "\(result.userCardName ?? result.bankName ?? "Kart") harcaması"
         } else if isEnglishSMS {
             title = extractEnglishMerchant(from: raw) ?? freeTitle(from: working)
         } else {
@@ -261,6 +294,8 @@ enum ExpenseParser {
         let isTagged: Bool
         /// Sayı ve para birimi kelimeleri çıkarılmış metin
         let cleaned: String
+        /// Tutarın `cleaned` içindeki kelime sırası (kart adı tutardan sonra mı?)
+        var tokenIndex: Int = 0
     }
 
     /// Yazıyla söylenmiş tutarı bulur:
@@ -380,7 +415,9 @@ enum ExpenseParser {
         let cleaned = raw.enumerated().filter { !removed.contains($0.offset) }.map(\.element).joined(separator: " ")
 
         let currency = chosen.currency.flatMap { $0 == Money.homeCurrency ? nil : $0 }
-        return SpokenAmount(value: chosen.amount, currency: currency, isTagged: chosen.tagged, cleaned: cleaned)
+        let tokenIndex = raw.indices.filter { $0 < chosen.start && !removed.contains($0) }.count
+        return SpokenAmount(value: chosen.amount, currency: currency, isTagged: chosen.tagged,
+                            cleaned: cleaned, tokenIndex: tokenIndex)
     }
 
     // MARK: Dikte ile taksit (TR + EN)
@@ -463,39 +500,109 @@ enum ExpenseParser {
 
     private static func freeTitle(from working: String) -> String {
         let stop: Set<String> = [
-            "tl", "try", "lira", "nakit", "kart", "kartla", "kartiyla", "ile",
+            "tl", "try", "lira", "nakit", "kart", "karti", "kartla", "kartiyla", "kartim", "kartimla", "ile",
             "taksit", "taksitle", "taksitli", "kredi", "harcama",
             "cash", "card", "installment", "installments",
             "dollar", "dollars", "buck", "bucks", "cent", "cents",
         ]
-        let bankWords = Set(Patterns.banks.map { $0.keyword }.filter { !$0.contains(" ") })
-        // Çok kelimeli banka adları ("Yapı Kredi", "İş Bankası", "Kuveyt Türk") başlıkta kalmasın:
-        // önceden "Apple 6000 3 taksit Yapı Kredi" → "Apple Yapı" oluyordu.
-        let bankPhrases = Patterns.banks.map { $0.keyword }.filter { $0.contains(" ") }
-            .map { $0.split(separator: " ").map(String.init) }
+        // Tanınan kart / banka adı 6b'de zaten çıkarıldı. Tutardan ÖNCE yazılan banka adı
+        // ("Bonus 200", "Wings 15") kart değildir, başlıkta kalır.
         let trimSet = CharacterSet.punctuationCharacters.union(.symbols)
-
-        var raw = working.split(whereSeparator: \.isWhitespace).map(String.init)
-        var norms = raw.map { $0.kurusNormalized.trimmingCharacters(in: trimSet) }
-        for phrase in bankPhrases where phrase.count <= norms.count {
-            var start = 0
-            while start + phrase.count <= norms.count {
-                if Array(norms[start..<(start + phrase.count)]) == phrase {
-                    raw.removeSubrange(start..<(start + phrase.count))
-                    norms.removeSubrange(start..<(start + phrase.count))
-                } else {
-                    start += 1
-                }
-            }
-        }
+        let raw = working.split(whereSeparator: \.isWhitespace).map(String.init)
+        let norms = raw.map { $0.kurusNormalized.trimmingCharacters(in: trimSet) }
 
         let tokens = zip(raw, norms)
-            .filter { _, n in !n.isEmpty && !stop.contains(n) && !bankWords.contains(n) }
+            .filter { _, n in !n.isEmpty && !stop.contains(n) }
             .map { token, _ in token }
 
         let joined = tokens.joined(separator: " ")
             .trimmingCharacters(in: CharacterSet(charactersIn: " -–—,.;:/*•+"))
         return joined.capitalizedFirstTR
+    }
+
+    // MARK: Kart / banka adı
+
+    struct CardMatch: Equatable {
+        /// Görünen ad: banka sözlüğünden kanonik ad ("Yapı Kredi") ya da kullanıcının kart adı
+        let name: String
+        let isUserCard: Bool
+        /// Eşleşen normalize kelimeler ("yapi", "kredi")
+        let parts: [String]
+        /// Kart adı çıkarılmış metin
+        let cleaned: String
+    }
+
+    /// Kart adı olamayacak genel kelimeler (kullanıcı kartı adı olarak da yok sayılır)
+    static let genericCardNames: Set<String> = [
+        "kart", "karti", "card", "nakit", "cash", "tl", "try", "kredi karti", "banka karti",
+        "credit card", "debit card",
+    ]
+
+    /// Kart / banka adını bulur ve metinden çıkarır. `afterToken`: tutarın kelime sırası; ad ancak
+    /// bu sıradan sonra başlıyorsa kart sayılır. `anywhere`: SMS / kart bağlamı → konum serbest.
+    /// Uzun adlar önce denenir ("Garanti BBVA" > "Garanti"); eşit uzunlukta kullanıcının kartları önce.
+    static func extractCard(from working: String, userCards: [String], afterToken: Int?, anywhere: Bool) -> CardMatch? {
+        guard anywhere || afterToken != nil else { return nil }
+        let trimSet = CharacterSet.punctuationCharacters.union(.symbols)
+        func words(_ text: String) -> [String] {
+            text.split(whereSeparator: \.isWhitespace)
+                .map { String($0).kurusNormalized.trimmingCharacters(in: trimSet) }
+                .filter { !$0.isEmpty }
+        }
+
+        var tokens = working.split(whereSeparator: \.isWhitespace).map(String.init)
+        let norms = tokens.map { $0.kurusNormalized.trimmingCharacters(in: trimSet) }
+        let minIndex = anywhere ? 0 : (afterToken ?? 0)
+
+        var candidates: [(parts: [String], name: String, isUser: Bool)] = []
+        for name in userCards {
+            let parts = words(name)
+            let joined = parts.joined(separator: " ")
+            guard joined.count >= 2, joined.contains(where: \.isLetter), !genericCardNames.contains(joined) else { continue }
+            candidates.append((parts, name.trimmingCharacters(in: .whitespacesAndNewlines), true))
+        }
+        for bank in Patterns.banks {
+            candidates.append((bank.keyword.split(separator: " ").map(String.init), bank.name, false))
+        }
+        let ordered = candidates.enumerated().sorted { a, b in
+            a.element.parts.count != b.element.parts.count
+                ? a.element.parts.count > b.element.parts.count
+                : a.offset < b.offset
+        }.map(\.element)
+
+        for candidate in ordered where candidate.parts.count <= norms.count {
+            let length = candidate.parts.count
+            guard minIndex <= norms.count - length else { continue }
+            for start in minIndex...(norms.count - length)
+            where Array(norms[start..<(start + length)]) == candidate.parts {
+                tokens.removeSubrange(start..<(start + length))
+                return CardMatch(name: candidate.name, isUserCard: candidate.isUser,
+                                 parts: candidate.parts, cleaned: tokens.joined(separator: " "))
+            }
+        }
+        return nil
+    }
+
+    /// Ayarlar'da "Kart Ekle": yazılan ad bilinen bir bankaysa kanonik adı ("garanti" → "Garanti BBVA").
+    static func knownBankName(for name: String) -> String? {
+        let normalized = name.kurusNormalized
+            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            .trimmingCharacters(in: .punctuationCharacters)
+        return Patterns.banks.first { $0.keyword == normalized || $0.name.kurusNormalized == normalized }?.name
+    }
+
+    /// Normalize metinden bir kelime dizisinin SON geçtiği yeri siler.
+    private static func removingLastPhrase(_ parts: [String], from norm: String) -> String {
+        guard !parts.isEmpty else { return norm }
+        let pattern = "(?<![\\p{L}\\p{N}])"
+            + parts.map { NSRegularExpression.escapedPattern(for: $0) }.joined(separator: "[^\\p{L}\\p{N}]+")
+            + "(?![\\p{L}\\p{N}])"
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let last = regex.matches(in: norm, range: NSRange(norm.startIndex..., in: norm)).last,
+              let range = Range(last.range, in: norm) else { return norm }
+        var out = norm
+        out.replaceSubrange(range, with: " ")
+        return out
     }
 
     /// "4532 ile biten Bonus kartınızla MIGROS TICARET A.S. işyerinde …" → "Migros"
@@ -700,7 +807,14 @@ private enum Patterns {
         "ending in", "card ending", "spent!", "purchase!", "transaction!", "charged!", "debit card", "credit card",
     ]
 
-    /// Önce kart programları (Bonus, World…), sonra bankalar.
+    /// Kart bağlamı: bu kelimeler varsa banka adı tutardan önce de yazılabilir ("Bonus kartla 200").
+    static let cardContextWords = [
+        "kart!", "karti!", "kartla!", "kartiyla!", "kartim!", "kartimla!", "kartimdan!",
+        "kartiniz!", "kartinizla!", "kartinizdan!", "card!", "cards!",
+    ]
+
+    /// Önce kart programları (Bonus, World…), sonra bankalar. Keyword: normalize, boşlukla ayrılmış
+    /// kelimeler. Uzun adlar eşleşmede önce denenir ("garanti bbva" > "garanti").
     static let banks: [(keyword: String, name: String)] = [
         ("bonus", "Bonus"), ("world", "World"), ("maximum", "Maximum"), ("axess", "Axess"),
         ("cardfinans", "CardFinans"), ("paraf", "Paraf"), ("bankkart", "Bankkart"),
@@ -711,6 +825,16 @@ private enum Patterns {
         ("halkbank", "Halkbank"), ("vakifbank", "VakıfBank"), ("qnb", "QNB"),
         ("denizbank", "DenizBank"), ("teb", "TEB"), ("ing", "ING"),
         ("kuveyt turk", "Kuveyt Türk"), ("albaraka", "Albaraka"),
+        ("garanti bbva", "Garanti BBVA"), ("finansbank", "QNB"), ("qnb finansbank", "QNB"),
+        // Yabancı bankalar (İngilizce ve Avrupa kullanıcıları)
+        ("chase", "Chase"), ("american express", "Amex"), ("amex", "Amex"),
+        ("citibank", "Citi"), ("citi", "Citi"), ("capital one", "Capital One"),
+        ("discover", "Discover"), ("bank of america", "Bank of America"), ("bofa", "Bank of America"),
+        ("wells fargo", "Wells Fargo"), ("us bank", "U.S. Bank"), ("apple card", "Apple Card"),
+        ("barclaycard", "Barclays"), ("barclays", "Barclays"), ("hsbc", "HSBC"),
+        ("lloyds", "Lloyds"), ("natwest", "NatWest"), ("monzo", "Monzo"),
+        ("revolut", "Revolut"), ("n26", "N26"), ("wise", "Wise"), ("santander", "Santander"),
+        ("deutsche bank", "Deutsche Bank"), ("bnp paribas", "BNP Paribas"),
     ]
 
     /// "dün" / "yesterday" → -1 · "bugün" / "today" → 0

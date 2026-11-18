@@ -58,6 +58,26 @@ final class SharedExpenseStore {
         snapshot.cards.first { $0.id == id }
     }
 
+    /// Ayrıştırıcıya giden kullanıcı kart adları: takma adlar ve banka sözlüğünde olmayan banka
+    /// adları ("Nkolay"). Sözlükteki bankalar ("Bonus", "Chase") zaten tanındığı için eklenmez.
+    var userCardNames: [String] {
+        var seen = Set<String>()
+        var names: [String] = []
+        for card in snapshot.cards {
+            var candidates: [String] = []
+            if let nickname = card.nickname?.trimmingCharacters(in: .whitespacesAndNewlines), !nickname.isEmpty {
+                candidates.append(nickname)
+            }
+            if !card.isBankUnknown, ExpenseParser.knownBankName(for: card.bankName) == nil {
+                candidates.append(card.bankName)
+            }
+            for name in candidates where seen.insert(name.kurusNormalized).inserted {
+                names.append(name)
+            }
+        }
+        return names
+    }
+
     /// Bu kayıt yeni bir kart oluşturur mu? (Ücretsiz planın kart sınırı için; veri değişmez.)
     func wouldCreateCard(for parsed: ParsedExpense) -> Bool {
         var probe = snapshot
@@ -114,13 +134,23 @@ final class SharedExpenseStore {
         }
     }
 
+    /// Kategoriyi değiştirir. Abonelik seçilen gider tekrarlayan olur (Yaklaşanlar'a ve gelecek aya
+    /// yansır); Abonelik'ten başka kategoriye geçen gider tekrarlayan olmaktan çıkar.
+    /// Taksitler zaten her ay ayrı kayıt olduğundan tekrarlayan yapılmaz.
     func setCategory(_ category: ExpenseCategory, for expense: Expense) {
         commit { s in
             for index in s.expenses.indices {
                 let item = s.expenses[index]
                 let sameGroup = expense.installment != nil && item.installment?.groupID == expense.installment?.groupID
                 if item.id == expense.id || sameGroup {
+                    let previous = item.category
                     s.expenses[index].category = category
+                    guard item.installment == nil else { continue }
+                    if category == .subscription {
+                        s.expenses[index].isRecurring = true
+                    } else if previous == .subscription {
+                        s.expenses[index].isRecurring = false
+                    }
                 }
             }
         }
@@ -140,6 +170,55 @@ final class SharedExpenseStore {
             s.cards[index].statementDay = statementDay
         }
     }
+
+    enum CardAddOutcome: Equatable { case added, updated }
+    enum CardAddError: Error, Equatable { case invalidName, invalidLast4, duplicate, limitReached }
+
+    /// Ayarlar → "Kart Ekle". Ad, ayrıştırıcının kart sözlüğüne girer ("Kahve 85 nkolay").
+    /// • Ad bilinen bir bankaysa kanonik adı kullanılır ("garanti" → "Garanti BBVA").
+    /// • Aynı son 4 haneli, bankası bilinmeyen kart (SMS'ten gelen "Kart ••1234") bu adı kazanır.
+    /// • Aynı adlı, son 4 hanesi olmayan kart son 4 haneyi kazanır. Aynısı varsa `.duplicate`.
+    /// • `allowNewCard == false` (ücretsiz plan sınırı) ve yeni kart gerekiyorsa `.limitReached`.
+    func addCard(name: String, last4: String?, allowNewCard: Bool) -> Result<CardAddOutcome, CardAddError> {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = trimmed.kurusNormalized
+        guard (2...24).contains(trimmed.count), trimmed.contains(where: \.isLetter),
+              !ExpenseParser.genericCardNames.contains(normalized) else { return .failure(.invalidName) }
+
+        let digits = last4?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard digits.isEmpty || (digits.count == 4 && digits.allSatisfy { $0.isASCII && $0.isNumber }) else {
+            return .failure(.invalidLast4)
+        }
+        let last4 = digits.isEmpty ? nil : digits
+        let bankName = ExpenseParser.knownBankName(for: trimmed) ?? trimmed
+
+        func sameName(_ card: PaymentCard) -> Bool {
+            card.bankName.kurusNormalized == bankName.kurusNormalized
+                || card.nickname?.kurusNormalized == normalized
+        }
+
+        if let last4, let index = snapshot.cards.firstIndex(where: { $0.last4 == last4 && $0.isBankUnknown && $0.nickname == nil }) {
+            commit { $0.cards[index].bankName = bankName }
+            return .success(.updated)
+        }
+        if let existing = snapshot.cards.firstIndex(where: sameName) {
+            let card = snapshot.cards[existing]
+            if card.last4 == last4 || last4 == nil { return .failure(.duplicate) }
+            if card.last4 == nil {
+                commit { $0.cards[existing].last4 = last4 }
+                return .success(.updated)
+            }
+            // Aynı bankanın başka bir kartı (farklı son 4 hane) → yeni kart.
+        }
+        guard allowNewCard else { return .failure(.limitReached) }
+        commit { s in
+            s.cards.append(PaymentCard(id: UUID().uuidString, last4: last4, bankName: bankName))
+        }
+        return .success(.added)
+    }
+
+    /// Ücretsiz plan sınırı için gerçek (demo olmayan) kart sayısı
+    var realCardCount: Int { snapshot.cards.filter { $0.isDemo != true }.count }
 
     /// Kartı kimliğiyle siler. SwiftData'daki .nullify / .cascade karşılığı:
     /// `keepExpenses == true`  → harcamalar "Nakit / Banka Kartı"na aktarılır (cardID = nil)
@@ -217,6 +296,23 @@ final class SharedExpenseStore {
     /// Kartlar adla değil kimlikle (id) tutulur; yeni kartlar UUID alır.
     private static func resolveCard(for parsed: ParsedExpense, in s: inout KurusSnapshot, isDemo: Bool = false) -> String? {
         if parsed.isCash { return nil }
+
+        // Kullanıcının kendi kart adı ("Kahve 85 nkolay"): takma ada ya da banka adına göre bulunur.
+        var parsed = parsed
+        if let name = parsed.userCardName {
+            let key = name.kurusNormalized
+            if let index = s.cards.firstIndex(where: { card in
+                (card.nickname?.kurusNormalized == key || card.bankName.kurusNormalized == key)
+                    && (parsed.cardLast4 == nil || card.last4 == nil || card.last4 == parsed.cardLast4)
+            }) {
+                if let last4 = parsed.cardLast4, s.cards[index].last4 == nil {
+                    s.cards[index].last4 = last4
+                }
+                return s.cards[index].id
+            }
+            // Kart bu arada silindiyse ad, banka adı olarak kullanılır.
+            if parsed.bankName == nil { parsed.bankName = name }
+        }
 
         // Banka adı biri tarafında bilinmiyorsa uyumlu sayılır; ikisi de biliniyorsa aynı olmalı.
         // Böylece "Bonus ••4532" ile "World ••4532" iki ayrı kart olarak kalır.
