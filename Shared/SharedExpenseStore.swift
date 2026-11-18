@@ -79,10 +79,11 @@ final class SharedExpenseStore {
         var created: [Expense] = []
         commit { s in
             if !isDemo {
-                s.expenses.removeAll { $0.isDemo }
+                // İlk gerçek giriş demoyu da temizler (örnek kartlar dahil)
+                Self.removeDemoData(from: &s)
                 s.hasCompletedOnboarding = true
             }
-            let cardID = Self.resolveCard(for: parsed, in: &s)
+            let cardID = Self.resolveCard(for: parsed, in: &s, isDemo: isDemo)
             created = Self.makeExpenses(from: parsed, total: total, cardID: cardID, date: date, isDemo: isDemo)
             s.expenses.append(contentsOf: created)
         }
@@ -180,9 +181,15 @@ final class SharedExpenseStore {
     /// Açılış demosunu temizler ve kullanıcıyı boş bir sayfayla başlatır.
     func clearDemo() {
         commit { s in
-            s.expenses.removeAll { $0.isDemo }
+            Self.removeDemoData(from: &s)
             s.hasCompletedOnboarding = true
         }
+    }
+
+    /// Demonun bütün izleri: örnek harcamalar ve demo sırasında oluşan kartlar (ör. "Yapı Kredi").
+    private static func removeDemoData(from s: inout KurusSnapshot) {
+        s.expenses.removeAll { $0.isDemo }
+        s.cards.removeAll { $0.isDemo == true }
     }
 
     /// "Tüm Verileri Sıfırla": harcamalar, kartlar ve bütçe bu cihazdan VE iCloud'dan silinir.
@@ -208,7 +215,7 @@ final class SharedExpenseStore {
 
     /// Aynı kartla (son 4 hane + uyumlu banka) gelen harcamalar o kartın havuzunda birleşir.
     /// Kartlar adla değil kimlikle (id) tutulur; yeni kartlar UUID alır.
-    private static func resolveCard(for parsed: ParsedExpense, in s: inout KurusSnapshot) -> String? {
+    private static func resolveCard(for parsed: ParsedExpense, in s: inout KurusSnapshot, isDemo: Bool = false) -> String? {
         if parsed.isCash { return nil }
 
         // Banka adı biri tarafında bilinmiyorsa uyumlu sayılır; ikisi de biliniyorsa aynı olmalı.
@@ -231,7 +238,7 @@ final class SharedExpenseStore {
                 s.cards[index].last4 = last4
                 return s.cards[index].id
             }
-            let card = PaymentCard(id: UUID().uuidString, last4: last4, bankName: parsed.bankName ?? "")
+            let card = PaymentCard(id: UUID().uuidString, last4: last4, bankName: parsed.bankName ?? "", isDemo: isDemo ? true : nil)
             s.cards.append(card)
             return card.id
         }
@@ -240,7 +247,7 @@ final class SharedExpenseStore {
             if let existing = s.cards.first(where: { $0.bankName.kurusNormalized == bank.kurusNormalized }) {
                 return existing.id
             }
-            let card = PaymentCard(id: UUID().uuidString, last4: nil, bankName: bank)
+            let card = PaymentCard(id: UUID().uuidString, last4: nil, bankName: bank, isDemo: isDemo ? true : nil)
             s.cards.append(card)
             return card.id
         }

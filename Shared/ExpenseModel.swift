@@ -101,6 +101,9 @@ struct PaymentCard: Codable, Identifiable, Hashable, Sendable {
     var nickname: String?
     /// Hesap kesim günü (1–31). `nil` → belirtilmemiş.
     var statementDay: Int?
+    /// İlk açılış demosunun oluşturduğu kart. "Clear & Start" ya da ilk gerçek giriş onu da siler.
+    /// İsteğe bağlı: eski sürümlerin kayıtları bu alan olmadan da okunur.
+    var isDemo: Bool? = nil
 
     var displayName: String {
         if let nickname, !nickname.trimmingCharacters(in: .whitespaces).isEmpty { return nickname }

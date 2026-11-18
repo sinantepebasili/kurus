@@ -302,7 +302,7 @@ struct ContentView: View {
                     Text(L("\(AppLanguage.brandName) böyle çalışır", "This is how \(AppLanguage.brandName) works"))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Theme.textPrimary)
-                    Text(L("Yaz ve Return’e bas. Marka, kart ve taksit kendiliğinden anlaşılır.", "Type and hit Return. Brand, card and installments are understood automatically."))
+                    Text(L("Yaz ve Gönder’e bas. Marka, kart, abonelik ve taksit kendiliğinden anlaşılır.", "Type and hit Send. Brands, cards, subscriptions and installments are understood automatically."))
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -503,8 +503,8 @@ struct ContentView: View {
             withAnimation(Theme.spring) { isDemoTyping = true }
             try? await Task.sleep(for: .milliseconds(800))
 
-            // Dile göre: "Kahve 145", "Migros 640", "Altın 4500" / "Coffee 5", "Whole Foods 85", "S&P 500 500"
-            for phrase in QuickSamples.all.map(\.command) {
+            // Dört adımlı "Aha!" demosu (bkz. QuickSamples.demoCommands)
+            for phrase in QuickSamples.demoCommands {
                 if Theme.reduceMotion {
                     // "Hareketi Azalt": harf harf yazma animasyonu yerine ifade tek seferde görünür
                     guard !Task.isCancelled else { return }
@@ -513,7 +513,7 @@ struct ContentView: View {
                     for character in phrase {
                         guard !Task.isCancelled else { return }
                         inputText.append(character)
-                        try? await Task.sleep(for: .milliseconds(85))
+                        try? await Task.sleep(for: .milliseconds(55))
                     }
                 }
                 try? await Task.sleep(for: .milliseconds(500))

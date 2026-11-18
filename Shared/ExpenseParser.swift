@@ -469,15 +469,29 @@ enum ExpenseParser {
             "dollar", "dollars", "buck", "bucks", "cent", "cents",
         ]
         let bankWords = Set(Patterns.banks.map { $0.keyword }.filter { !$0.contains(" ") })
+        // Çok kelimeli banka adları ("Yapı Kredi", "İş Bankası", "Kuveyt Türk") başlıkta kalmasın:
+        // önceden "Apple 6000 3 taksit Yapı Kredi" → "Apple Yapı" oluyordu.
+        let bankPhrases = Patterns.banks.map { $0.keyword }.filter { $0.contains(" ") }
+            .map { $0.split(separator: " ").map(String.init) }
         let trimSet = CharacterSet.punctuationCharacters.union(.symbols)
 
-        let tokens = working
-            .split(whereSeparator: \.isWhitespace)
-            .map(String.init)
-            .filter { token in
-                let n = token.kurusNormalized.trimmingCharacters(in: trimSet)
-                return !n.isEmpty && !stop.contains(n) && !bankWords.contains(n)
+        var raw = working.split(whereSeparator: \.isWhitespace).map(String.init)
+        var norms = raw.map { $0.kurusNormalized.trimmingCharacters(in: trimSet) }
+        for phrase in bankPhrases where phrase.count <= norms.count {
+            var start = 0
+            while start + phrase.count <= norms.count {
+                if Array(norms[start..<(start + phrase.count)]) == phrase {
+                    raw.removeSubrange(start..<(start + phrase.count))
+                    norms.removeSubrange(start..<(start + phrase.count))
+                } else {
+                    start += 1
+                }
             }
+        }
+
+        let tokens = zip(raw, norms)
+            .filter { _, n in !n.isEmpty && !stop.contains(n) && !bankWords.contains(n) }
+            .map { token, _ in token }
 
         let joined = tokens.joined(separator: " ")
             .trimmingCharacters(in: CharacterSet(charactersIn: " -–—,.;:/*•+"))
