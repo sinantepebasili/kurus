@@ -87,6 +87,9 @@ enum ExpenseCategory: String, Codable, CaseIterable, Identifiable, Sendable {
 // MARK: - Kart
 
 struct PaymentCard: Codable, Identifiable, Hashable, Sendable {
+    /// Kalıcı, benzersiz kimlik. Yeni kartlar `UUID().uuidString` alır; ad değişse de, iki kart aynı
+    /// adı taşısa da tüm güncellemeler (ad, hesap kesim günü) yalnızca bu kimlikle yapılır.
+    /// (Eski sürümlerden gelen "card-4532" / "bank-bonus" biçimli kimlikler aynen geçerli kalır.)
     var id: String
     var last4: String?
     var bankName: String
@@ -96,8 +99,11 @@ struct PaymentCard: Codable, Identifiable, Hashable, Sendable {
 
     var displayName: String {
         if let nickname, !nickname.trimmingCharacters(in: .whitespaces).isEmpty { return nickname }
-        return bankName
+        return isBankUnknown ? L("Kart", "Card") : bankName
     }
+
+    /// Banka adı bilinmiyor mu? (Eski sürümler bilinmeyen bankayı "Kart" olarak saklıyordu.)
+    var isBankUnknown: Bool { bankName.isEmpty || bankName == "Kart" }
 
     var maskedSuffix: String { last4.map { "••\($0)" } ?? "" }
 

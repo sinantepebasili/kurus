@@ -57,7 +57,8 @@ enum ExportManager {
     // Ondalık ayırıcı "," olan yerel ayarlarda (tr, de…) alan ayırıcı ";", aksi halde ",".
 
     static func writeCSV(_ export: CSVExport) throws -> URL {
-        let cardNames = Dictionary(uniqueKeysWithValues: export.cards.map { ($0.id, $0.pillTitle) })
+        // Kimlik çakışması olsa bile (eski veri) çökmesin: ilk kart kazanır
+        let cardNames = Dictionary(export.cards.map { ($0.id, $0.pillTitle) }, uniquingKeysWith: { first, _ in first })
         let separator = CurrencyFormat.style().decimal == "," ? ";" : ","
         let header = AppLanguage.isTurkish
             ? ["Tarih", "Saat", "Açıklama", "Kategori", "Tutar", "Para Birimi", "Kart", "Taksit", "Tekrarlayan", "Not"]

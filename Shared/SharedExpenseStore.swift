@@ -130,6 +130,16 @@ final class SharedExpenseStore {
         commit { $0.monthlyBudget = value.rounded(0) }
     }
 
+    /// Kartın adını ve hesap kesim gününü tek seferde, yalnızca kimliğe (id) göre günceller.
+    func updateCard(id: String, nickname: String, statementDay: Int?) {
+        let trimmed = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+        commit { s in
+            guard let index = s.cards.firstIndex(where: { $0.id == id }) else { return }
+            s.cards[index].nickname = trimmed.isEmpty ? nil : trimmed
+            s.cards[index].statementDay = statementDay
+        }
+    }
+
     func renameCard(id: String, to name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         commit { s in
@@ -163,13 +173,21 @@ final class SharedExpenseStore {
 
     // MARK: - Kart havuzu
 
-    /// Aynı son 4 haneyle gelen harcamalar aynı kartın havuzunda birleşir.
+    /// Aynı kartla (son 4 hane + uyumlu banka) gelen harcamalar o kartın havuzunda birleşir.
+    /// Kartlar adla değil kimlikle (id) tutulur; yeni kartlar UUID alır.
     private static func resolveCard(for parsed: ParsedExpense, in s: inout KurusSnapshot) -> String? {
         if parsed.isCash { return nil }
 
+        // Banka adı biri tarafında bilinmiyorsa uyumlu sayılır; ikisi de biliniyorsa aynı olmalı.
+        // Böylece "Bonus ••4532" ile "World ••4532" iki ayrı kart olarak kalır.
+        func sameBank(_ card: PaymentCard) -> Bool {
+            guard let bank = parsed.bankName, !card.isBankUnknown else { return true }
+            return card.bankName.kurusNormalized == bank.kurusNormalized
+        }
+
         if let last4 = parsed.cardLast4 {
-            if let index = s.cards.firstIndex(where: { $0.last4 == last4 }) {
-                if let bank = parsed.bankName, s.cards[index].bankName == "Kart" {
+            if let index = s.cards.firstIndex(where: { $0.last4 == last4 && sameBank($0) }) {
+                if let bank = parsed.bankName, s.cards[index].isBankUnknown {
                     s.cards[index].bankName = bank
                 }
                 return s.cards[index].id
@@ -180,7 +198,7 @@ final class SharedExpenseStore {
                 s.cards[index].last4 = last4
                 return s.cards[index].id
             }
-            let card = PaymentCard(id: "card-\(last4)", last4: last4, bankName: parsed.bankName ?? "Kart")
+            let card = PaymentCard(id: UUID().uuidString, last4: last4, bankName: parsed.bankName ?? "")
             s.cards.append(card)
             return card.id
         }
@@ -189,8 +207,7 @@ final class SharedExpenseStore {
             if let existing = s.cards.first(where: { $0.bankName.kurusNormalized == bank.kurusNormalized }) {
                 return existing.id
             }
-            let slug = bank.kurusNormalized.filter { $0.isLetter || $0.isNumber }
-            let card = PaymentCard(id: "bank-\(slug)", last4: nil, bankName: bank)
+            let card = PaymentCard(id: UUID().uuidString, last4: nil, bankName: bank)
             s.cards.append(card)
             return card.id
         }

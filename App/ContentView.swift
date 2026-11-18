@@ -15,6 +15,8 @@ struct ContentView: View {
     @AppStorage("kurus.privacyMode") private var isPrivate = false
 
     @State private var inputText = ""
+    /// Başarılı kayıttan sonra giriş alanını kesin olarak temizlemek için (bkz. SmartInputBarView.resetToken)
+    @State private var inputResetToken = 0
     @FocusState private var inputFocused: Bool
     @State private var filter: CardFilter = .all
     @State private var selectedMonth = Ledger.startOfMonth(.now)
@@ -141,7 +143,8 @@ struct ContentView: View {
                 text: $inputText,
                 isFocused: $inputFocused,
                 isDemoTyping: isDemoTyping,
-                lockedFeature: lockedFeature(for:)
+                lockedFeature: lockedFeature(for:),
+                resetToken: inputResetToken
             ) { parsed in
                 commit(parsed, isDemo: false)
             }
@@ -391,7 +394,10 @@ struct ContentView: View {
             withAnimation(Theme.spring) { filter = .all }
         }
 
-        withAnimation(Theme.spring) { inputText = "" }
+        // Kayıt başarılı: giriş alanını temizle. Bağlam boşaltılır ve TextField yeniden oluşturulur;
+        // yalnızca `inputText = ""` yapmak, Return sırasında alanın eski metni göstermesini engellemiyordu.
+        inputText = ""
+        inputResetToken &+= 1
         markFresh(created.map(\.id))
 
         if !isDemo {

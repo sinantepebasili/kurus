@@ -13,6 +13,8 @@ struct SmartInputBarView: View {
     var isDemoTyping: Bool = false
     /// Ücretsiz planda bu giriş bir Pro özelliğine takılıyorsa (taksit, ikinci kart) — hapta kilit gösterilir
     var lockedFeature: (ParsedExpense) -> ProFeature? = { _ in nil }
+    /// Her başarılı kayıtta artar; TextField yeniden oluşturulur ve ekrandaki metin kesin olarak temizlenir.
+    var resetToken: Int = 0
     var onSubmit: (ParsedExpense) -> Void
 
     @State private var shakes: CGFloat = 0
@@ -51,6 +53,9 @@ struct SmartInputBarView: View {
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.sentences)
                     .onSubmit(submit)
+                    // Return'de klavye oturumu kapanırken UITextField, bağlam ("") boşalsa bile eski metni
+                    // gösterebiliyor. Kimlik değişince alan sıfırdan çizilir; odak ContentView'da geri verilir.
+                    .id(resetToken)
 
                     if !text.isEmpty && !isDemoTyping {
                         Button {

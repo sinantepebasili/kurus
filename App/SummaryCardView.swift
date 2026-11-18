@@ -24,8 +24,8 @@ struct SummaryCardView: View {
     @State private var budgetDraft = ""
     @FocusState private var budgetFocused: Bool
 
-    @State private var renamingCard: PaymentCard?
-    @State private var renameDraft = ""
+    /// Düzenlenen kartın KİMLİĞİ (ad değil). Sayfa her zaman doğru kartı açar.
+    @State private var editingCard: CardEditTarget?
 
     @State private var showBreakdown = false
 
@@ -75,22 +75,9 @@ struct SummaryCardView: View {
                 upcomingStrip
             }
         }
-        .alert(
-            L("Kart Adı", "Card Name"),
-            isPresented: Binding(
-                get: { renamingCard != nil },
-                set: { if !$0 { renamingCard = nil } }
-            ),
-            presenting: renamingCard
-        ) { card in
-            TextField(L("Örn. Bonus Platinum", "e.g. Sapphire Reserve"), text: $renameDraft)
-            Button(L("Kaydet", "Save")) {
-                withAnimation(Theme.spring) { store.renameCard(id: card.id, to: renameDraft) }
-                Haptics.success()
-            }
-            Button(L("Vazgeç", "Cancel"), role: .cancel) {}
-        } message: { card in
-            Text(card.last4.map { L("••\($0) ile biten kart", "Card ending in \($0)") } ?? L("\(card.bankName) kartı", "\(card.bankName) card"))
+        .sheet(item: $editingCard) { target in
+            CardEditorSheet(cardID: target.id)
+                .environment(store)
         }
         .sheet(isPresented: $showBreakdown) {
             CategoryBreakdownSheet(
@@ -452,69 +439,64 @@ struct SummaryCardView: View {
                 pill(title: L("Tümü", "All"), symbol: "square.stack.fill", value: .all)
                 pill(title: L("Nakit", "Cash"), symbol: "banknote.fill", value: .cash)
                 ForEach(store.cards) { card in
-                    pill(title: card.pillTitle, symbol: "creditcard.fill", value: .card(card.id))
-                        .contextMenu { cardMenu(card) }
+                    cardPill(card)
                 }
             }
         }
         .contentMargins(.horizontal, Theme.gutter, for: .scrollContent)
     }
 
+    private func select(_ value: CardFilter) {
+        guard filter != value else { return }
+        withAnimation(Theme.spring) { filter = value }
+        Haptics.selection()
+    }
+
     private func pill(title: String, symbol: String, value: CardFilter) -> some View {
-        let selected = filter == value
-        return Button {
-            guard filter != value else { return }
-            withAnimation(Theme.spring) { filter = value }
-            Haptics.selection()
+        Button {
+            select(value)
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: symbol)
-                    .font(.system(size: 11, weight: .semibold))
-                Text(title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .monospacedDigit()
-                    .lineLimit(1)
-            }
-            .foregroundStyle(selected ? Theme.background : Theme.textSecondary)
-            .padding(.horizontal, 14)
-            .frame(height: 34)
-            .background(selected ? Theme.textPrimary : Theme.surface, in: Capsule())
-            .overlay(Capsule().strokeBorder(selected ? Color.clear : Theme.hairline, lineWidth: 1))
-            .contentShape(Capsule())
+            pillLabel(title: title, symbol: symbol, selected: filter == value)
         }
         .buttonStyle(.plain)
     }
 
-    @ViewBuilder
-    private func cardMenu(_ card: PaymentCard) -> some View {
-        Button {
-            renameDraft = card.displayName
-            renamingCard = card
-        } label: {
-            Label(L("Kart Adını Değiştir", "Rename Card"), systemImage: "pencil")
-        }
-
-        Menu {
-            Picker(L("Hesap Kesim Günü", "Statement Day"), selection: Binding(
-                get: { card.statementDay ?? 0 },
-                set: { newValue in
-                    withAnimation(Theme.spring) {
-                        store.setStatementDay(newValue == 0 ? nil : newValue, forCard: card.id)
-                    }
-                    Haptics.success()
-                }
-            )) {
-                Text(L("Belirtilmedi", "Not set")).tag(0)
-                ForEach(1...31, id: \.self) { day in
-                    Text(L("Her ayın \(day). günü", "Day \(day) of each month")).tag(day)
-                }
+    /// Kart hapı: dokun → filtrele, basılı tut → o kartın (id) düzenleme sayfası.
+    /// Not: Bu haplar bir List satırının içinde. SwiftUI, List satırındaki alt görünümlere eklenen
+    /// .contextMenu'yü tüm satıra bağladığı için her hapın menüsü aynı karta gidiyordu; bu yüzden
+    /// bağlam menüsü yerine kimlikle açılan bir sayfa kullanılıyor.
+    private func cardPill(_ card: PaymentCard) -> some View {
+        let value = CardFilter.card(card.id)
+        let cardID = card.id
+        return pillLabel(title: card.pillTitle, symbol: "creditcard.fill", selected: filter == value)
+            .onTapGesture { select(value) }
+            .onLongPressGesture(minimumDuration: 0.4) {
+                Haptics.tap()
+                editingCard = CardEditTarget(id: cardID)
             }
-        } label: {
-            Label(
-                card.statementDay.map { L("Hesap Kesim Günü · \($0)", "Statement Day · \($0)") } ?? L("Hesap Kesim Günü Seç", "Set Statement Day"),
-                systemImage: "calendar"
-            )
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint(L("Düzenlemek için basılı tut", "Touch and hold to edit"))
+            .accessibilityAction(named: L("Kartı Düzenle", "Edit Card")) {
+                editingCard = CardEditTarget(id: cardID)
+            }
+    }
+
+    private func pillLabel(title: String, symbol: String, selected: Bool) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .semibold))
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+                .monospacedDigit()
+                .lineLimit(1)
         }
+        .foregroundStyle(selected ? Theme.background : Theme.textSecondary)
+        .padding(.horizontal, 14)
+        .frame(height: 34)
+        .background(selected ? Theme.textPrimary : Theme.surface, in: Capsule())
+        .overlay(Capsule().strokeBorder(selected ? Color.clear : Theme.hairline, lineWidth: 1))
+        .contentShape(Capsule())
     }
 
     // MARK: - Yaklaşan ödemeler / kesim tarihleri şeridi
@@ -597,5 +579,131 @@ private struct UpcomingChip: View {
         .padding(.vertical, 8)
         .craftCard(radius: 14)
         .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - Kart düzenleme (kimliğe göre)
+
+struct CardEditTarget: Identifiable, Hashable {
+    /// PaymentCard.id — ad değil
+    let id: String
+}
+
+/// Kartın görünen adı ve hesap kesim günü. Kart her zaman `cardID` ile bulunur ve güncellenir;
+/// iki kart aynı adı taşısa bile verileri birbirine karışmaz.
+struct CardEditorSheet: View {
+    let cardID: String
+
+    @Environment(SharedExpenseStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var name = ""
+    @State private var statementDay = 0
+    @State private var didLoad = false
+    @FocusState private var nameFocused: Bool
+
+    var body: some View {
+        let card = store.card(id: cardID)
+
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                if let card {
+                    HStack(spacing: 12) {
+                        Image(systemName: "creditcard.fill")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Theme.ocean)
+                            .frame(width: 36, height: 36)
+                            .background(Theme.ocean.opacity(0.16), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(card.isBankUnknown ? L("Kart", "Card") : card.bankName)
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(Theme.textPrimary)
+                            Text(card.last4.map { L("••\($0) ile biten kart", "Card ending in \($0)") } ?? L("Son 4 hane henüz bilinmiyor", "Last 4 digits not known yet"))
+                                .font(.system(size: 13))
+                                .monospacedDigit()
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(L("GÖRÜNEN AD", "DISPLAY NAME"))
+                            .font(.system(size: 11, weight: .semibold))
+                            .tracking(0.6)
+                            .foregroundStyle(Theme.textSecondary)
+                        TextField(text: $name, prompt: Text(card.isBankUnknown ? L("Örn. Bonus Platinum", "e.g. Sapphire Reserve") : card.bankName).foregroundStyle(Theme.textMuted)) {
+                            Text(L("Görünen ad", "Display name"))
+                        }
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(Theme.textPrimary)
+                        .tint(Theme.emerald)
+                        .focused($nameFocused)
+                        .submitLabel(.done)
+                        .onSubmit(save)
+                        .padding(.horizontal, 12)
+                        .frame(height: 44)
+                        .background(Theme.elevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
+                    }
+
+                    HStack {
+                        Label(L("Hesap Kesim Günü", "Statement Day"), systemImage: "calendar")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(Theme.textPrimary)
+                        Spacer(minLength: 8)
+                        Picker(L("Hesap Kesim Günü", "Statement Day"), selection: $statementDay) {
+                            Text(L("Belirtilmedi", "Not set")).tag(0)
+                            ForEach(1...31, id: \.self) { day in
+                                Text(L("Her ayın \(day). günü", "Day \(day) of each month")).tag(day)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(Theme.emerald)
+                    }
+                    .padding(.horizontal, 12)
+                    .frame(height: 48)
+                    .background(Theme.elevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
+                } else {
+                    Text(L("Bu kart artık yok.", "This card no longer exists."))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(Theme.gutter)
+            .background(Theme.surface)
+            .navigationTitle(L("Kartı Düzenle", "Edit Card"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Theme.surface, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(L("Vazgeç", "Cancel")) { dismiss() }
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(L("Kaydet", "Save"), action: save)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.emerald)
+                        .disabled(card == nil)
+                }
+            }
+        }
+        .presentationDetents([.height(360)])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Theme.surface)
+        .presentationCornerRadius(28)
+        .onAppear {
+            guard !didLoad, let card else { return }
+            name = card.nickname ?? ""
+            statementDay = card.statementDay ?? 0
+            didLoad = true
+        }
+    }
+
+    private func save() {
+        withAnimation(Theme.spring) {
+            store.updateCard(id: cardID, nickname: name, statementDay: statementDay == 0 ? nil : statementDay)
+        }
+        Haptics.success()
+        dismiss()
     }
 }
