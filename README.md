@@ -79,7 +79,7 @@ Satın alma Apple'ın yerel **StoreKit 2** çerçevesiyle yapılır; 3. parti k�
 6. Bundle ID değişirse ürün kimliklerini `StoreManager.Plan.productID` ve `Kurus.storekit` içinde de güncelleyin.
 
 **Yerelde deneme (App Store Connect olmadan):**
-- **StoreKit yapılandırması:** Scheme › Run › Options › **StoreKit Configuration** alanından proje kökündeki `Kurus.storekit` dosyasını seçin. Bu dosya üç ürünü USD fiyatlarıyla tanımlar; Türk mağazası için *Editor › Default Storefront* kullanılabilir.
+- **StoreKit yapılandırması:** Paylaşılan şemalar (Kurus, KurusWidgetExtension) proje kökündeki `Kurus.storekit` dosyasını hazır seçili getirir (Scheme › Run › Options › **StoreKit Configuration**). Bu alan boşsa Xcode’dan yapılan kurulumlar gerçek Sandbox’a gider ve Sandbox test hesabı ister. Bu dosya üç ürünü USD fiyatlarıyla tanımlar; Türk mağazası için *Editor › Default Storefront* kullanılabilir.
 - **İşlem yönetimi:** Satın almaları *Debug › StoreKit › Manage Transactions* penceresinden iade edebilir veya silebilirsiniz.
 - **Doğrulama durumu:** `Kurus.storekit` elle yazıldı ve yalnızca JSON olarak doğrulandı. Xcode açmazsa *File › New › File › StoreKit Configuration File* ile yeniden oluşturup aynı üç ürünü ekleyin.
 
