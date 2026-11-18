@@ -13,7 +13,7 @@ struct AddExpenseIntent: AppIntent {
     // Sabit metinler Localizable.xcstrings'ten gelir (kaynak dil: en, çeviri: tr).
     static let title: LocalizedStringResource = "Add Expense"
     static let description = IntentDescription(
-        "Logs a short note (“Coffee 5”, “Laptop 1200 3x”) or a full bank SMS / Apple Pay notification as an expense.",
+        "Logs a short note (“Coffee 5”, “Laptop 1200 3x”) or a full bank SMS / wallet notification as an expense.",
         categoryName: "Expenses"
     )
     static let openAppWhenRun: Bool = false
@@ -37,7 +37,7 @@ struct AddExpenseIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog & ShowsSnippetView {
-        // Kestirmeler, Siri, SMS / Apple Pay otomasyonu ve interaktif widget Pro özelliğidir.
+        // Kestirmeler, Siri, SMS / cüzdan bildirimi otomasyonu ve interaktif widget Pro özelliğidir.
         // Pro durumu App Group'tan okunur (StoreManager uygulamada doğrular ve yazar).
         guard ProStatus.isPro else {
             throw KurusIntentError.proRequired
