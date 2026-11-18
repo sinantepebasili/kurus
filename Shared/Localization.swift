@@ -175,8 +175,16 @@ enum QuickSamples {
             ]
     }
 
-    /// Giriş çubuğu ipucu
-    static var placeholder: String { L("Netflix 299, Kahve 145…", "Netflix 15, Coffee 5…") }
+    /// Giriş çubuğu ipucu (ilk görünen)
+    static var placeholder: String { hints[0] }
+
+    /// Giriş kutusu boşken birkaç saniyede bir dönen örnek komutlar (Heuristic #10).
+    /// Yalnızca ayrıştırıcının gerçekten anladığı komutlar: tutar, marka, taksit, gelir, "dün".
+    static var hints: [String] {
+        AppLanguage.isTurkish
+            ? ["Kahve 85 TL", "Netflix 109", "Market 450 dün", "Telefon 36000 3t", "+Maaş 65000", "Kira 25000"]
+            : ["Coffee $5", "Spotify 11", "Lunch 12 yesterday", "Laptop 1200 3x", "+Salary 5000", "$45 Walmart"]
+    }
 }
 
 // MARK: - Yüzde

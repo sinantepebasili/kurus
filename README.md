@@ -47,7 +47,20 @@ Satın alma Apple'ın yerel **StoreKit 2** çerçevesiyle yapılır; 3. parti k�
   - Onay sorduktan sonra harcamaları, kartları ve bütçeyi bu cihazdan ve iCloud'dan siler (`SharedExpenseStore.resetAllData()`).
   - Uygulama SwiftData kullanmıyor; veri App Group `UserDefaults` + iCloud anahtar-değer deposunda tek bir `KurusSnapshot` olarak tutuluyor. Boş anlık görüntü en yeni zaman damgasıyla yazıldığı için iCloud'a bağlı diğer cihazlar da boşalır.
   - Pro satın alımı Apple'da olduğu için etkilenmez.
-- **Yasal:** Gizlilik Politikası, Apple Standart EULA ve sürüm/build (`v1.0 (1)`).
+- **Nasıl Kullanılır?:** Dört örnek komut.
+- **iCloud & Veri Yönetimi:**
+  - iCloud durumu (`ubiquityIdentityToken`).
+  - Kayıtlı kartlar: dokununca düzenleme, çöp kutusuyla silme.
+- **Hakkında:** Gizlilik Politikası, Apple Standart EULA ve sürüm/build (`v1.0 (1)`).
+- **Pro ödemesini gider olarak ekleme:** Satın almadan sonra ya da Ayarlar'da bir kez, isteğe bağlı sunulur.
+  - Aylık → tekrarlayan gider; Yaklaşan Ödemeler'de yenileme olarak görünür.
+  - Yıllık / Ömür Boyu → bugüne tek seferlik harcama.
+
+**Kart silme:**
+- Kart hapına ya da hesap kesimi kutusuna basılı tut › *Kartı Sil*, ya da Ayarlar'daki kart listesinden.
+- Silmeden önce sorulur: harcamalar *Nakit / Banka Kartı*'na aktarılsın mı (SwiftData'daki `.nullify` karşılığı), yoksa kartla birlikte silinsin mi (`.cascade`)?
+- Hiçbir harcama silinmiş bir karta bağlı kalmaz.
+- Haplarda `.contextMenu` bilinçli olarak kullanılmıyor: List satırı içindeki bağlam menüleri tüm satıra bağlandığı için yanlış kartı düzenliyordu.
 
 **App Store Connect'te elle yapılacaklar:**
 1. *Business › Agreements* altında **Paid Applications** sözleşmesini imzalayın; banka ve vergi bilgilerini doldurun. Bu adım tamamlanmadan ürünler yüklenmez.

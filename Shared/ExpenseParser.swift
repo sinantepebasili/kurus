@@ -136,6 +136,10 @@ enum ExpenseParser {
         //    b) yazıyla + para birimi etiketli — sesli dikte ("five dollars", "yüz kırk beş lira", "five cents")
         //    c) rakamla, etiketsiz → en büyük sayı ("Kahve 145")
         //    d) yazıyla, etiketsiz — metinde hiç rakam yoksa ("Coffee five", "Market iki yüz")
+        // Dikte binlik ayracı: "bin lira" → "1.000" → "1000". Ondalık virgül ("109,50") korunur;
+        // "14.11.2026" gibi tarihler etkilenmez (yalnızca tam 3 haneden önceki nokta).
+        working = working.replacingOccurrences(of: #"(?<=\d)\.(?=\d{3}\b)"#, with: "", options: .regularExpression)
+
         let candidates: [Candidate] = matches(Patterns.number, in: working).compactMap { m in
             guard let g = m.group(1), let value = decimal(from: String(working[g])), value > 0 else { return nil }
             let tag = currencyTag(for: m.whole, in: working)

@@ -121,6 +121,10 @@ final class StoreManager {
     private(set) var willAutoRenew: Bool?
 
     private(set) var isPro: Bool
+    /// Aktif hakkın satın alma zinciri kimliği (Transaction.originalID)
+    private(set) var activeOriginalID: UInt64?
+    /// "Kendini gider olarak ekle" teklifinin yanıtlandığı satın alma
+    private(set) var selfExpenseHandledID: String?
     private(set) var products: [String: Product] = [:]
     private(set) var isPurchasing = false
     private(set) var restoreState: RestoreState = .idle
@@ -135,6 +139,7 @@ final class StoreManager {
         // Doğrulama bitene kadar son bilinen durumla başla (açılışta kilit titremesin)
         isPro = ProStatus.isPro
         activePlan = ProStatus.cachedPlanID.flatMap(Plan.init(productID:))
+        selfExpenseHandledID = ProStatus.selfExpenseHandledID
         transactionUpdates = listenForTransactions()
         statusUpdates = listenForSubscriptionStatus()
         Task {
@@ -189,15 +194,16 @@ final class StoreManager {
         }
 
         guard let best else {
-            apply(plan: nil, expiration: nil, autoRenew: nil)
+            apply(plan: nil, expiration: nil, autoRenew: nil, originalID: nil)
             return
         }
 
         if best.plan.isSubscription {
             let autoRenew = await autoRenewStatus(for: best.transaction)
-            apply(plan: best.plan, expiration: best.transaction.expirationDate, autoRenew: autoRenew)
+            apply(plan: best.plan, expiration: best.transaction.expirationDate, autoRenew: autoRenew,
+                  originalID: best.transaction.originalID)
         } else {
-            apply(plan: best.plan, expiration: nil, autoRenew: nil)
+            apply(plan: best.plan, expiration: nil, autoRenew: nil, originalID: best.transaction.originalID)
         }
     }
 
@@ -221,10 +227,11 @@ final class StoreManager {
         return nil
     }
 
-    private func apply(plan: Plan?, expiration: Date?, autoRenew: Bool?) {
+    private func apply(plan: Plan?, expiration: Date?, autoRenew: Bool?, originalID: UInt64?) {
         let isNowPro = plan != nil
         let changed = isPro != isNowPro || ProStatus.isPro != isNowPro
         activePlan = plan
+        activeOriginalID = originalID
         expirationDate = expiration
         willAutoRenew = autoRenew
         isPro = isNowPro
@@ -318,6 +325,50 @@ final class StoreManager {
         await refreshEntitlements()
         restoreState = isPro ? .restored : .nothingToRestore
         if !isPro { lastError = restoreState.message }
+    }
+
+    // MARK: - Pro ödemesini gider olarak ekleme (isteğe bağlı, tek dokunuş)
+
+    /// Aktif satın alma için teklif henüz yanıtlanmadıysa `true`
+    var shouldOfferSelfExpense: Bool {
+        guard isPro, activePlan != nil, let id = activeOriginalID else { return false }
+        return selfExpenseHandledID != String(id)
+    }
+
+    /// Teklif metninde gösterilecek tutar ("₺79,99" / "$2.99")
+    func selfExpensePrice(for plan: Plan) -> String {
+        displayPrice(for: plan)
+    }
+
+    /// Aylık → tekrarlayan gider (Yaklaşan Ödemeler'de yenileme olarak görünür).
+    /// Yıllık / Ömür Boyu → bugüne tek seferlik harcama. Teklif bir daha sorulmaz.
+    @discardableResult
+    func logSelfExpense(in store: SharedExpenseStore) -> [Expense] {
+        guard let plan = activePlan else { return [] }
+        let product = product(for: plan)
+        let amount = product?.price ?? plan.fallbackAmount
+        let code = product?.priceFormatStyle.currencyCode ?? (AppLanguage.isTurkish ? "TRY" : "USD")
+
+        let title = "\(AppLanguage.brandName) Pro"
+        var parsed = ParsedExpense(rawText: title, title: title)
+        parsed.amount = amount
+        parsed.currencyCode = code == Money.homeCurrency ? nil : code
+        parsed.category = plan == .lifetime ? .technology : .subscription
+        parsed.isRecurring = plan == .monthly
+
+        let created = store.add(parsed)
+        markSelfExpenseHandled()
+        return created
+    }
+
+    func dismissSelfExpenseOffer() {
+        markSelfExpenseHandled()
+    }
+
+    private func markSelfExpenseHandled() {
+        guard let id = activeOriginalID else { return }
+        selfExpenseHandledID = String(id)
+        ProStatus.selfExpenseHandledID = String(id)
     }
 
     /// Sayfa kapanınca eski geri yükleme mesajı kalmasın

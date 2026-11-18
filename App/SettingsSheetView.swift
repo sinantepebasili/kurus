@@ -6,8 +6,9 @@
 //
 //  • Üyelik Durumu: aktif plan, yenilenme / sona erme tarihi, Aboneliği Yönet (yerel
 //    .manageSubscriptionsSheet), Pro'ya Geç, Satın Alımları Geri Yükle (App Review 3.1.1)
-//  • Veri Yönetimi: hesap olmadığı için "Tüm Verileri Sıfırla" (cihaz + iCloud), onaylı
-//  • Yasal: Gizlilik Politikası, Apple Standart EULA ve sürüm / build numarası
+//  • Nasıl Kullanılır?: dört örnek komut (Heuristic #10)
+//  • iCloud & Veri Yönetimi: iCloud durumu, kayıtlı kartlar (düzenle / sil), "Tüm Verileri Sıfırla"
+//  • Hakkında: Gizlilik Politikası, Apple Standart EULA ve sürüm / build numarası
 //
 
 import StoreKit
@@ -22,6 +23,8 @@ struct SettingsSheetView: View {
     @State private var showManageSubscriptions = false
     @State private var confirmReset = false
     @State private var didReset = false
+    @State private var editingCard: CardEditTarget?
+    @State private var pendingDelete: PaymentCard?
 
     private var brand: String { AppLanguage.brandName }
 
@@ -30,6 +33,7 @@ struct SettingsSheetView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     membershipSection
+                    tipsSection
                     dataSection
                     legalSection
                 }
@@ -65,6 +69,11 @@ struct SettingsSheetView: View {
         .sheet(isPresented: $showPaywall) {
             PaywallView(feature: .general)
                 .environment(storeManager)
+                .environment(store)
+        }
+        .sheet(item: $editingCard) { target in
+            CardEditorSheet(cardID: target.id)
+                .environment(store)
         }
         .confirmationDialog(
             L("Tüm Verileri Sıfırla", "Reset All Data"),
@@ -169,6 +178,12 @@ struct SettingsSheetView: View {
                         .foregroundStyle(storeManager.restoreState.isError ? Theme.coral : Theme.emerald)
                         .transition(.opacity)
                 }
+
+                // Satın alma bu sayfadan yapılmadıysa (ör. geri yükleme) teklif burada bir kez sunulur
+                if storeManager.shouldOfferSelfExpense, let plan = storeManager.activePlan {
+                    ProSelfExpenseOffer(plan: plan)
+                        .transition(.opacity)
+                }
             }
             .padding(16)
             .craftCard(radius: 18)
@@ -212,11 +227,108 @@ struct SettingsSheetView: View {
         }
     }
 
-    // MARK: - Veri Yönetimi
+    // MARK: - Nasıl Kullanılır? (Heuristic #10 — yardım ve dokümantasyon)
+
+    private var tipsSection: some View {
+        let tips: [(command: String, meaning: String)] = AppLanguage.isTurkish
+            ? [
+                ("Kahve 85", "Tutar ve başlık; kategori ile marka kendiliğinden"),
+                ("+Maaş 65000", "Başta + ile gelir; o ayın bütçesi olur"),
+                ("Market 450 dün", "“dün” yazınca dünün tarihiyle kaydedilir"),
+                ("Telefon 36000 3t", "Taksitler gelecek aylara bölünür (Pro)"),
+            ]
+            : [
+                ("Coffee 5", "Amount and title; category and brand are detected"),
+                ("+Salary 5000", "A leading + logs income; it becomes the month’s budget"),
+                ("Lunch 12 yesterday", "“yesterday” logs it with yesterday’s date"),
+                ("Laptop 1200 3x", "Installments are spread over the coming months (Pro)"),
+            ]
+
+        return VStack(alignment: .leading, spacing: 8) {
+            sectionHeader(L("NASIL KULLANILIR? (İPUÇLARI)", "HOW TO USE (TIPS)"))
+
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(tips, id: \.command) { tip in
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text(tip.command)
+                            .font(.system(size: 13.5, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(Theme.emerald)
+                            .fixedSize()
+                        Text(tip.meaning)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+                Text(L("Kart haplarına basılı tutarak kartın adını, hesap kesim gününü düzenleyebilir ya da kartı silebilirsin.",
+                       "Touch and hold a card chip to rename it, set its statement day or delete it."))
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Theme.textMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(16)
+            .craftCard(radius: 18)
+        }
+    }
+
+    // MARK: - iCloud & Veri Yönetimi
+
+    /// iCloud hesabı açık mı? (Anahtar-değer eşitlemesi kişisel iCloud hesabıyla çalışır)
+    private var isICloudAvailable: Bool {
+        FileManager.default.ubiquityIdentityToken != nil
+    }
 
     private var dataSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader(L("VERİ YÖNETİMİ", "DATA"))
+            sectionHeader(L("iCLOUD & VERİ YÖNETİMİ", "iCLOUD & DATA"))
+
+            // iCloud durumu (Heuristic #1)
+            HStack(spacing: 12) {
+                Image(systemName: isICloudAvailable ? "icloud.fill" : "icloud.slash.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(isICloudAvailable ? Theme.emerald : Theme.amber)
+                    .frame(width: 24)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(isICloudAvailable
+                         ? L("iCloud Senkronizasyonu: Aktif", "iCloud Sync: On")
+                         : L("iCloud Senkronizasyonu: Kapalı", "iCloud Sync: Off"))
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text(isICloudAvailable
+                         ? L("Kayıtlar kişisel iCloud hesabınla eşitleniyor.", "Records sync with your personal iCloud account.")
+                         : L("Yalnızca bu cihazda. Ayarlar › [Adın] › iCloud’dan açabilirsin.", "This device only. Turn it on in Settings › [Your Name] › iCloud."))
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(14)
+            .craftCard(radius: 16)
+            .accessibilityElement(children: .combine)
+
+            // Kayıtlı kartlar
+            VStack(spacing: 0) {
+                if store.cards.isEmpty {
+                    Text(L("Henüz kart yok. Banka SMS’i ya da “Kahve 85 bonus” gibi bir girişle kendiliğinden eklenir.",
+                           "No cards yet. They’re added automatically from a bank SMS or an entry like “Coffee 5 chase”."))
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.textSecondary)
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    ForEach(Array(store.cards.enumerated()), id: \.element.id) { index, card in
+                        if index > 0 {
+                            Rectangle().fill(Theme.hairline).frame(height: 1).padding(.leading, 50)
+                        }
+                        cardRow(card)
+                    }
+                }
+            }
+            .craftCard(radius: 16)
+            // Ayrı görünümde: sayfadaki "Tüm Verileri Sıfırla" onayıyla çakışmasın
+            .cardDeletionDialog(card: $pendingDelete)
 
             Button(role: .destructive) {
                 confirmReset = true
@@ -246,11 +358,63 @@ struct SettingsSheetView: View {
         }
     }
 
-    // MARK: - Yasal & Sürüm
+    private func cardRow(_ card: PaymentCard) -> some View {
+        let count = store.expenseCount(forCard: card.id)
+        return HStack(spacing: 12) {
+            Button {
+                editingCard = CardEditTarget(id: card.id)
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "creditcard.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.ocean)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(card.pillTitle)
+                            .font(.system(size: 15, weight: .medium))
+                            .monospacedDigit()
+                            .foregroundStyle(Theme.textPrimary)
+                            .lineLimit(1)
+                        Text([
+                            card.statementDay.map { L("Hesap kesimi: her ayın \($0). günü", "Statement: day \($0)") }
+                                ?? L("Hesap kesim günü yok", "No statement day"),
+                            L("\(count) harcama", "\(count) expense(s)"),
+                        ].joined(separator: " · "))
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(Theme.textSecondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(L("Düzenlemek için dokun", "Tap to edit"))
+
+            Button {
+                pendingDelete = card
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.coral)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L("\(card.pillTitle) kartını sil", "Delete \(card.pillTitle)"))
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 4)
+        .padding(.vertical, 4)
+    }
+
+    // MARK: - Hakkında (yasal & sürüm)
 
     private var legalSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader(L("YASAL", "LEGAL"))
+            sectionHeader(L("HAKKINDA", "ABOUT"))
 
             VStack(spacing: 0) {
                 legalRow(L("Gizlilik Politikası", "Privacy Policy"), symbol: "hand.raised.fill", url: LegalLinks.privacy)

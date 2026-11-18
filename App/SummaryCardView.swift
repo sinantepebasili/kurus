@@ -166,12 +166,13 @@ struct SummaryCardView: View {
                 .frame(width: 24, height: 24)
                 .background(Theme.elevated, in: Circle())
                 .overlay(Circle().strokeBorder(Theme.hairline, lineWidth: 1))
-                .padding(4)
+                // Görünür 24pt, dokunma alanı 44×44pt (HIG); yerleşimi büyütmez
+                .padding(10)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
-        .padding(-4)
+        .padding(-10)
         .accessibilityLabel(label)
     }
 
@@ -197,7 +198,7 @@ struct SummaryCardView: View {
     private var filterLabel: String {
         switch filter {
         case .all: return isFutureMonth ? L("PLANLANAN", "SCHEDULED") : L("TÜM HARCAMALAR", "ALL SPENDING")
-        case .cash: return L("NAKİT", "CASH")
+        case .cash: return PaymentCard.cashTitle.uppercased(with: KurusDate.locale)
         case .card(let id):
             return (store.card(id: id)?.pillTitle ?? L("KART", "CARD")).uppercased(with: KurusDate.locale)
         }
@@ -209,7 +210,7 @@ struct SummaryCardView: View {
         let scope: String
         switch filter {
         case .all: scope = L("Tüm harcamalar", "All spending")
-        case .cash: scope = L("Nakit", "Cash")
+        case .cash: scope = PaymentCard.cashTitle
         case .card(let id): scope = store.card(id: id)?.pillTitle ?? L("Kart", "Card")
         }
         return "\(KurusDate.monthYear(month)) · \(scope)"
@@ -242,7 +243,9 @@ struct SummaryCardView: View {
             .padding(.horizontal, 8)
             .frame(height: 22)
             .background(tint.opacity(0.14), in: Capsule())
-            .contentShape(Capsule())
+            .padding(.vertical, 11)
+            .contentShape(Rectangle())
+            .padding(.vertical, -11)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(L("Kategori analizi", "Category breakdown"))
@@ -409,16 +412,20 @@ struct SummaryCardView: View {
             .animation(Theme.spring, value: spendShare)
 
             HStack {
-                legend(color: Theme.ocean, title: L("Gerçek Harcama", "Spending"), share: total > 0 ? spendShare : 0)
+                legend(color: Theme.ocean, symbol: "circle.fill", title: L("Gerçek Harcama", "Spending"), share: total > 0 ? spendShare : 0)
                 Spacer(minLength: 8)
-                legend(color: Theme.violet, title: L("Birikim / Yatırım", "Savings / Investing"), share: savedShare)
+                legend(color: Theme.violet, symbol: "diamond.fill", title: L("Birikim / Yatırım", "Savings / Investing"), share: savedShare)
             }
         }
     }
 
-    private func legend(color: Color, title: String, share: Double) -> some View {
+    /// Renk körü kullanıcılar için anlam yalnızca renge bağlı değil: ● Harcama · ◆ Birikim (WCAG 1.4.1)
+    private func legend(color: Color, symbol: String, title: String, share: Double) -> some View {
         HStack(spacing: 6) {
-            Circle().fill(color).frame(width: 7, height: 7)
+            Image(systemName: symbol)
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(color)
+                .accessibilityHidden(true)
             Text(title)
                 .foregroundStyle(Theme.textSecondary)
             Text(Percent.string(share))
@@ -437,7 +444,8 @@ struct SummaryCardView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 pill(title: L("Tümü", "All"), symbol: "square.stack.fill", value: .all)
-                pill(title: L("Nakit", "Cash"), symbol: "banknote.fill", value: .cash)
+                pill(title: PaymentCard.cashTitle, symbol: "banknote.fill", value: .cash)
+                    .accessibilityHint(L("Kredi kartı dışındaki ödemeler: nakit ve banka kartı", "Payments not on a credit card: cash and debit"))
                 ForEach(store.cards) { card in
                     cardPill(card)
                 }
@@ -496,7 +504,9 @@ struct SummaryCardView: View {
         .frame(height: 34)
         .background(selected ? Theme.textPrimary : Theme.surface, in: Capsule())
         .overlay(Capsule().strokeBorder(selected ? Color.clear : Theme.hairline, lineWidth: 1))
-        .contentShape(Capsule())
+        .padding(.vertical, 5)
+        .contentShape(Rectangle())
+        .padding(.vertical, -5)
     }
 
     // MARK: - Yaklaşan ödemeler / kesim tarihleri şeridi
@@ -528,7 +538,10 @@ struct SummaryCardView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(items) { item in
-                            UpcomingChip(item: item)
+                            UpcomingChip(item: item) { cardID in
+                                Haptics.tap()
+                                editingCard = CardEditTarget(id: cardID)
+                            }
                         }
                     }
                 }
@@ -543,6 +556,8 @@ struct SummaryCardView: View {
 
 private struct UpcomingChip: View {
     let item: UpcomingPayment
+    /// Hesap kesimi kutusu için: basılı tutunca kartın düzenleme/silme sayfası
+    var onEditCard: (String) -> Void = { _ in }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -578,7 +593,27 @@ private struct UpcomingChip: View {
         .padding(.trailing, 12)
         .padding(.vertical, 8)
         .craftCard(radius: 14)
+        .contentShape(Rectangle())
+        .onLongPressGesture(minimumDuration: 0.4) {
+            if let cardID = item.cardID { onEditCard(cardID) }
+        }
         .accessibilityElement(children: .combine)
+        .modifier(EditCardAction(cardID: item.cardID, onEditCard: onEditCard))
+    }
+}
+
+/// Yalnızca kart satırlarına VoiceOver "Kartı Düzenle" eylemi ekler
+private struct EditCardAction: ViewModifier {
+    let cardID: String?
+    let onEditCard: (String) -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let cardID {
+            content.accessibilityAction(named: L("Kartı Düzenle", "Edit Card")) { onEditCard(cardID) }
+        } else {
+            content
+        }
     }
 }
 
@@ -600,6 +635,7 @@ struct CardEditorSheet: View {
     @State private var name = ""
     @State private var statementDay = 0
     @State private var didLoad = false
+    @State private var pendingDelete: PaymentCard?
     @FocusState private var nameFocused: Bool
 
     var body: some View {
@@ -663,6 +699,20 @@ struct CardEditorSheet: View {
                     .frame(height: 48)
                     .background(Theme.elevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
+
+                    // Silme doğrudan yapılmaz: harcamaların ne olacağı sorulur (Heuristic #5)
+                    Button(role: .destructive) {
+                        nameFocused = false
+                        pendingDelete = card
+                    } label: {
+                        Label(L("Kartı Sil", "Delete Card"), systemImage: "trash")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Theme.coral)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 } else {
                     Text(L("Bu kart artık yok.", "This card no longer exists."))
                         .foregroundStyle(Theme.textSecondary)
@@ -687,7 +737,8 @@ struct CardEditorSheet: View {
                 }
             }
         }
-        .presentationDetents([.height(360)])
+        .cardDeletionDialog(card: $pendingDelete) { dismiss() }
+        .presentationDetents([.height(420)])
         .presentationDragIndicator(.visible)
         .presentationBackground(Theme.surface)
         .presentationCornerRadius(28)
@@ -705,5 +756,55 @@ struct CardEditorSheet: View {
         }
         Haptics.success()
         dismiss()
+    }
+}
+
+// MARK: - Seçenekli kart silme (Heuristic #5 — hata önleme)
+
+/// "'[Kart]' kartını silmek üzeresiniz. Bu karta bağlı harcamalar ne olsun?"
+/// a) Sadece Kartı Sil (harcamalar Nakit / Banka Kartı'na aktarılır)
+/// b) Kartı ve Bağlı Harcamaları Sil (destructive)
+/// c) Vazgeç
+struct CardDeletionDialog: ViewModifier {
+    @Binding var card: PaymentCard?
+    var onDeleted: () -> Void = {}
+
+    @Environment(SharedExpenseStore.self) private var store
+
+    func body(content: Content) -> some View {
+        content.confirmationDialog(
+            L("‘\(card?.pillTitle ?? "")’ kartını silmek üzeresiniz. Bu karta bağlı harcamalar ne olsun?",
+              "You’re about to delete ‘\(card?.pillTitle ?? "")’. What should happen to its expenses?"),
+            isPresented: Binding(get: { card != nil }, set: { if !$0 { card = nil } }),
+            titleVisibility: .visible,
+            presenting: card
+        ) { target in
+            Button(L("Sadece Kartı Sil (Harcamaları \(PaymentCard.cashTitle)’na Aktar)",
+                     "Delete Card Only (Move Expenses to \(PaymentCard.cashTitle))")) {
+                delete(target, keepExpenses: true)
+            }
+            Button(L("Kartı ve Bağlı Harcamaları Sil", "Delete Card and Its Expenses"), role: .destructive) {
+                delete(target, keepExpenses: false)
+            }
+            Button(L("Vazgeç", "Cancel"), role: .cancel) {}
+        } message: { target in
+            let count = store.expenseCount(forCard: target.id)
+            Text(L("Bu karta bağlı \(count) harcama var.", "\(count) expense(s) are linked to this card."))
+        }
+    }
+
+    private func delete(_ target: PaymentCard, keepExpenses: Bool) {
+        withAnimation(Theme.spring) {
+            store.deleteCard(id: target.id, keepExpenses: keepExpenses)
+        }
+        Haptics.warning()
+        card = nil
+        onDeleted()
+    }
+}
+
+extension View {
+    func cardDeletionDialog(card: Binding<PaymentCard?>, onDeleted: @escaping () -> Void = {}) -> some View {
+        modifier(CardDeletionDialog(card: card, onDeleted: onDeleted))
     }
 }

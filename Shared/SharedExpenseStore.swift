@@ -140,6 +140,28 @@ final class SharedExpenseStore {
         }
     }
 
+    /// Kartı kimliğiyle siler. SwiftData'daki .nullify / .cascade karşılığı:
+    /// `keepExpenses == true`  → harcamalar "Nakit / Banka Kartı"na aktarılır (cardID = nil)
+    /// `keepExpenses == false` → karta bağlı harcamalar da silinir
+    /// Hiçbir harcama, var olmayan bir karta bağlı (yetim) kalmaz.
+    func deleteCard(id: String, keepExpenses: Bool) {
+        commit { s in
+            if keepExpenses {
+                for index in s.expenses.indices where s.expenses[index].cardID == id {
+                    s.expenses[index].cardID = nil
+                }
+            } else {
+                s.expenses.removeAll { $0.cardID == id }
+            }
+            s.cards.removeAll { $0.id == id }
+        }
+    }
+
+    /// Karta bağlı harcama sayısı (silme onayında gösterilir)
+    func expenseCount(forCard id: String) -> Int {
+        snapshot.expenses.filter { $0.cardID == id }.count
+    }
+
     func renameCard(id: String, to name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         commit { s in

@@ -25,12 +25,42 @@ struct PaywallView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var selected: StoreManager.Plan = .lifetime
+    /// Bu sayfadan yapılan başarılı satın alma → teşekkür + "gider olarak ekle" teklifi
+    @State private var purchasedPlan: StoreManager.Plan?
+    /// Satın alma sürerken isPro değişse de sayfa kendiliğinden kapanmasın
+    @State private var awaitingPurchase = false
     /// Kısa ekran (iPhone SE): özellik satırları ve üst boşluk biraz daha sıkılaşır
     @State private var isCompactHeight = false
 
     private var brand: String { AppLanguage.brandName }
 
     var body: some View {
+        Group {
+            if let plan = purchasedPlan {
+                ProWelcomeView(plan: plan) { dismiss() }
+                    .transition(.opacity)
+            } else {
+                shopContent
+            }
+        }
+        .background(Theme.background)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Theme.background)
+        .presentationCornerRadius(28)
+        .preferredColorScheme(.dark)
+        .onChange(of: store.isPro) { _, isPro in
+            // Geri yükleme ya da başka cihazdan gelen alım: sayfa kapanır.
+            // Bu sayfadan yapılan alım: teşekkür ekranı gösterilir.
+            if isPro, !awaitingPurchase, purchasedPlan == nil { dismiss() }
+        }
+        .task {
+            if store.products.isEmpty { await store.loadProducts() }
+        }
+        .onDisappear { store.clearRestoreState() }
+    }
+
+    private var shopContent: some View {
         ScrollView {
             // Kompakt kompozisyon: iPhone 13–16'da logo, 4 özellik, 3 plan ve "Devam Et" kaydırmadan görünür.
             // Yalnızca SE gibi çok küçük ekranlarda ScrollView devreye girer.
@@ -55,19 +85,6 @@ struct PaywallView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { footer }
         .overlay(alignment: .topTrailing) { closeButton }
-        .background(Theme.background)
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        .presentationBackground(Theme.background)
-        .presentationCornerRadius(28)
-        .preferredColorScheme(.dark)
-        .onChange(of: store.isPro) { _, isPro in
-            if isPro { dismiss() }
-        }
-        .task {
-            if store.products.isEmpty { await store.loadProducts() }
-        }
-        .onDisappear { store.clearRestoreState() }
     }
 
     // MARK: - Üst bölüm
@@ -290,8 +307,16 @@ struct PaywallView: View {
             Button {
                 Haptics.tap()
                 Task {
-                    let success = await store.purchase(selected)
-                    if success { Haptics.success() } else if store.lastError != nil { Haptics.error() }
+                    let plan = selected
+                    awaitingPurchase = true
+                    let success = await store.purchase(plan)
+                    awaitingPurchase = false
+                    if success {
+                        Haptics.success()
+                        withAnimation(Theme.spring) { purchasedPlan = plan }
+                    } else if store.lastError != nil {
+                        Haptics.error()
+                    }
                 }
             } label: {
                 ZStack {
@@ -330,10 +355,13 @@ struct PaywallView: View {
                 .frame(width: 30, height: 30)
                 .background(Theme.surface, in: Circle())
                 .overlay(Circle().strokeBorder(Theme.hairline, lineWidth: 1))
+                // Görünür 30pt, dokunma alanı 44pt
+                .padding(7)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.top, 16)
-        .padding(.trailing, Theme.gutter)
+        .padding(.top, 9)
+        .padding(.trailing, Theme.gutter - 7)
         .accessibilityLabel(L("Kapat", "Close"))
     }
 }
@@ -383,5 +411,131 @@ struct LegalFooterLinks: View {
         .buttonStyle(.plain)
         .lineLimit(1)
         .minimumScaleFactor(0.6)
+    }
+}
+
+// MARK: - Satın alma sonrası (Heuristic #1 — sistem durumu görünürlüğü)
+
+/// Başarılı satın almadan sonra: net onay + isteğe bağlı "gider olarak ekle" + Bitti
+struct ProWelcomeView: View {
+    let plan: StoreManager.Plan
+    var onDone: () -> Void
+
+    @Environment(StoreManager.self) private var storeManager
+    @State private var showOffer = false
+    @State private var appeared = false
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Spacer(minLength: 0)
+
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 44, weight: .semibold))
+                .foregroundStyle(Theme.emerald)
+                // Sembol efektleri sistemin "Hareketi Azalt" ayarına kendiliğinden uyar
+                .symbolEffect(.bounce, value: appeared)
+
+            VStack(spacing: 6) {
+                Text(L("\(AppLanguage.brandName) Pro aktif", "\(AppLanguage.brandName) Pro is active"))
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundStyle(Theme.textPrimary)
+                Text(plan.membershipTitle)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.emerald)
+                Text(L("Tüm Pro özellikleri şimdi açık. Teşekkürler!", "All Pro features are unlocked. Thank you!"))
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            if showOffer {
+                ProSelfExpenseOffer(plan: plan)
+                    .padding(.top, 6)
+            }
+
+            Spacer(minLength: 0)
+
+            Button(action: onDone) {
+                Text(L("Bitti", "Done"))
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Theme.background)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(Theme.textPrimary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+            .buttonStyle(SpringPressStyle())
+        }
+        .padding(.horizontal, Theme.gutter)
+        .padding(.vertical, 24)
+        .onAppear {
+            showOffer = storeManager.shouldOfferSelfExpense
+            appeared = true
+            AccessibilityNotification.Announcement(L("\(AppLanguage.brandName) Pro aktif", "\(AppLanguage.brandName) Pro is active")).post()
+        }
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// "Cent Pro aboneliğini yaklaşan sabit ödemelerime ekle" (aylık) /
+/// "Cent Pro ödemesini bugünkü harcamalarıma kaydet" (yıllık, ömür boyu) — tek dokunuş, isteğe bağlı
+struct ProSelfExpenseOffer: View {
+    let plan: StoreManager.Plan
+
+    @Environment(StoreManager.self) private var storeManager
+    @Environment(SharedExpenseStore.self) private var store
+    @State private var added = false
+
+    private var price: String { storeManager.selfExpensePrice(for: plan) }
+    private var brand: String { AppLanguage.brandName }
+
+    private var offerTitle: String {
+        plan == .monthly
+            ? L("\(brand) Pro aboneliğini (\(price)/ay) yaklaşan sabit ödemelerime de ekle",
+                "Also add \(brand) Pro (\(price)/mo) to my upcoming fixed payments")
+            : L("\(brand) Pro ödemesini (\(price)) bugünkü harcamalarıma kaydet",
+                "Log the \(brand) Pro payment (\(price)) in today’s expenses")
+    }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            if added {
+                Label(plan == .monthly ? L("Sabit ödemelere eklendi", "Added to fixed payments") : L("Bugüne kaydedildi", "Logged for today"),
+                      systemImage: "checkmark.circle.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.emerald)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            } else {
+                Button {
+                    withAnimation(Theme.spring) {
+                        storeManager.logSelfExpense(in: store)
+                        added = true
+                    }
+                    Haptics.success()
+                } label: {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: plan == .monthly ? "calendar.badge.plus" : "plus.circle.fill")
+                            .font(.system(size: 15, weight: .semibold))
+                        Text(offerTitle)
+                            .font(.system(size: 14, weight: .semibold))
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                    }
+                    .foregroundStyle(Theme.emerald)
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Theme.emerald.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.emerald.opacity(0.25), lineWidth: 1))
+                }
+                .buttonStyle(SpringPressStyle())
+
+                Button(L("Şimdi değil", "Not now")) {
+                    withAnimation(Theme.spring) { storeManager.dismissSelfExpenseOffer() }
+                }
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Theme.textSecondary)
+                .frame(minHeight: 44)
+            }
+        }
     }
 }

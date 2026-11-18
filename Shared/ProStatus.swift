@@ -40,6 +40,15 @@ enum ProStatus {
         }
     }
 
+    static let selfExpenseKey = "proSelfExpenseHandledTransaction"
+
+    /// "Pro ödemesini giderlerime ekle" teklifi hangi satın alma (originalID) için yanıtlandı?
+    /// (Eklendi ya da "Şimdi değil" denildi → aynı satın alma için bir daha sorulmaz.)
+    static var selfExpenseHandledID: String? {
+        get { defaults?.string(forKey: selfExpenseKey) }
+        set { defaults?.set(newValue, forKey: selfExpenseKey) }
+    }
+
     /// Ücretsiz planda izin verilen kart sayısı (nakit sayılmaz)
     static let freeCardLimit = 1
 }

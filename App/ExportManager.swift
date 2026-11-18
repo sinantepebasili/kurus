@@ -73,7 +73,7 @@ enum ExportManager {
                 e.category.title,
                 (e.category.isIncome ? "" : "-") + CurrencyFormat.plain(e.amount),
                 e.currencyCode ?? Money.homeCurrency,
-                e.cardID.flatMap { cardNames[$0] } ?? L("Nakit", "Cash"),
+                e.cardID.flatMap { cardNames[$0] } ?? PaymentCard.cashTitle,
                 e.installment?.label ?? "",
                 e.isRecurring ? L("Evet", "Yes") : L("Hayır", "No"),
                 e.note ?? "",
@@ -295,7 +295,7 @@ struct StatementPDFView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Text(e.category.title).frame(width: 70, alignment: .leading).foregroundStyle(sub)
-            Text(card?.pillTitle ?? L("Nakit", "Cash"))
+            Text(card?.pillTitle ?? PaymentCard.cashShortTitle)
                 .lineLimit(1)
                 .frame(width: 84, alignment: .leading)
                 .foregroundStyle(sub)

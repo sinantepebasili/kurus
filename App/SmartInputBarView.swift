@@ -18,13 +18,36 @@ struct SmartInputBarView: View {
     var onSubmit: (ParsedExpense) -> Void
 
     @State private var shakes: CGFloat = 0
+    /// "Tutar eklemeyi unuttunuz" mikro uyarısı (2,5 sn) — Heuristic #9
+    @State private var amountHint: String?
+    @State private var hintTask: Task<Void, Never>?
+    /// Kutu boşken dönen örnek komut — Heuristic #10
+    @State private var placeholderIndex = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let parsed = ExpenseParser.parse(text)
         let isValid = parsed?.isValid ?? false
 
         VStack(spacing: 10) {
-            if let parsed {
+            if let amountHint {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundStyle(Theme.amber)
+                        .accessibilityHidden(true)
+                    Text(amountHint)
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                }
+                .font(.system(size: 14, weight: .semibold))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay(Capsule().strokeBorder(Theme.amber.opacity(0.35), lineWidth: 1))
+                .padding(.horizontal, Theme.gutter)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            } else if let parsed {
                 LiveParsePill(parsed: parsed, locked: lockedFeature(parsed))
                     .padding(.horizontal, Theme.gutter)
                     .transition(
@@ -42,14 +65,15 @@ struct SmartInputBarView: View {
                         .foregroundStyle(isDemoTyping ? Theme.amber : Theme.textMuted)
                         .contentTransition(.symbolEffect(.replace))
 
-                    TextField(text: $text, prompt: Text(QuickSamples.placeholder).foregroundStyle(Theme.textMuted)) {
+                    TextField(text: $text, prompt: Text(currentHint).foregroundStyle(Theme.textMuted)) {
                         Text(L("Harcama", "Expense"))
                     }
                     .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(Theme.textPrimary)
                     .tint(Theme.emerald)
                     .focused(isFocused)
-                    .submitLabel(.return)
+                    // Klavyedeki "Gönder" tuşu, yukarı ok butonuyla aynı işi yapar (Heuristic #7)
+                    .submitLabel(.send)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.sentences)
                     .onSubmit(submit)
@@ -64,6 +88,8 @@ struct SmartInputBarView: View {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 16))
                                 .foregroundStyle(Theme.textMuted)
+                                .frame(width: 32, height: 44)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(L("Temizle", "Clear"))
@@ -88,7 +114,8 @@ struct SmartInputBarView: View {
                         .scaleEffect(isValid ? 1 : 0.92)
                 }
                 .buttonStyle(.plain)
-                .disabled(!isValid)
+                // Tutarsız metinde de basılabilir: sessizce başarısız olmak yerine yapıcı uyarı gösterilir
+                .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .accessibilityLabel(L("Kaydet", "Save"))
             }
             .padding(.horizontal, Theme.gutter)
@@ -105,17 +132,54 @@ struct SmartInputBarView: View {
             }
         }
         .animation(Theme.spring, value: parsed != nil)
+        .onChange(of: text) { _, newText in
+            // Kullanıcı tutarı ekleyince uyarı hemen kalkar
+            if amountHint != nil, ExpenseParser.parse(newText)?.isValid == true {
+                hintTask?.cancel()
+                withAnimation(Theme.spring) { amountHint = nil }
+            }
+        }
+        .task {
+            // Kutu boşken örnek komutlar birkaç saniyede bir döner
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(4))
+                if text.isEmpty && !isDemoTyping { placeholderIndex &+= 1 }
+            }
+        }
         .animation(Theme.spring, value: isValid)
+    }
+
+    private var currentHint: String {
+        let hints = QuickSamples.hints
+        return hints[placeholderIndex % hints.count]
     }
 
     private func submit() {
         guard let parsed = ExpenseParser.parse(text), parsed.isValid else {
-            guard !text.isEmpty else { return }
-            Haptics.error()
-            withAnimation(.linear(duration: 0.4)) { shakes += 1 }
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            // Metin korunur; kullanıcı yalnızca sayıyı ekleyebilir
+            Haptics.warning()
+            if !reduceMotion {
+                withAnimation(.linear(duration: 0.4)) { shakes += 1 }
+            }
+            showAmountHint()
             return
         }
+        hintTask?.cancel()
+        amountHint = nil
         onSubmit(parsed)
+    }
+
+    private func showAmountHint() {
+        let message = L("Tutar eklemeyi unuttunuz (Örn: Kahve 85)", "Please include an amount (e.g., Coffee 5)")
+        hintTask?.cancel()
+        withAnimation(Theme.spring) { amountHint = message }
+        AccessibilityNotification.Announcement(message).post()
+        hintTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(2500))
+            guard !Task.isCancelled else { return }
+            withAnimation(Theme.spring) { amountHint = nil }
+        }
     }
 }
 

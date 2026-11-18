@@ -153,6 +153,7 @@ struct ContentView: View {
         .sheet(isPresented: $showGuide) {
             AutomationGuideSheet()
                 .environment(storeManager)
+                .environment(store)
         }
         .sheet(isPresented: $showSettings) {
             SettingsSheetView()
@@ -168,6 +169,7 @@ struct ContentView: View {
         .sheet(item: $paywallFeature) { feature in
             PaywallView(feature: feature)
                 .environment(storeManager)
+                .environment(store)
         }
         .sheet(item: $categoryTarget) { expense in
             CategoryPickerSheet(expense: expense) { category in
@@ -420,6 +422,9 @@ struct ContentView: View {
 
         if !isDemo {
             Haptics.success()
+            // "Kaydedildi • Geri Al" — her kayıt tek dokunuşla geri alınabilir (Heuristic #3)
+            showToast(UndoToastState(kind: .saved, title: first.title, removed: created))
+            AccessibilityNotification.Announcement(L("\(first.title) kaydedildi", "\(first.title) saved")).post()
             // Hızlı art arda giriş için klavye açık kalır.
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(60))
@@ -432,16 +437,25 @@ struct ContentView: View {
         let removed = withAnimation(Theme.spring) { store.delete(expense) }
         guard !removed.isEmpty else { return }
         Haptics.warning()
-        showToast(UndoToastState(title: expense.title, removed: removed))
+        showToast(UndoToastState(kind: .deleted, title: expense.title, removed: removed))
     }
 
     private func undo(_ state: UndoToastState) {
         toastTask?.cancel()
-        withAnimation(Theme.spring) {
-            store.restore(state.removed)
-            toast = nil
+        switch state.kind {
+        case .deleted:
+            withAnimation(Theme.spring) {
+                store.restore(state.removed)
+                toast = nil
+            }
+            markFresh(state.removed.map(\.id))
+        case .saved:
+            // Son kaydı geri al (taksitliyse tüm taksit grubu)
+            withAnimation(Theme.spring) {
+                if let first = state.removed.first { store.delete(first) }
+                toast = nil
+            }
         }
-        markFresh(state.removed.map(\.id))
         Haptics.success()
     }
 
@@ -449,7 +463,8 @@ struct ContentView: View {
         toastTask?.cancel()
         withAnimation(Theme.spring) { toast = state }
         toastTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(3))
+            // Kaydetme bildirimi biraz daha uzun kalır (3,5 sn) — okumak ve geri almak için zaman
+            try? await Task.sleep(for: .milliseconds(state.kind == .saved ? 3500 : 3000))
             guard !Task.isCancelled else { return }
             withAnimation(Theme.spring) { toast = nil }
         }
@@ -490,10 +505,16 @@ struct ContentView: View {
 
             // Dile göre: "Kahve 145", "Migros 640", "Altın 4500" / "Coffee 5", "Whole Foods 85", "S&P 500 500"
             for phrase in QuickSamples.all.map(\.command) {
-                for character in phrase {
+                if Theme.reduceMotion {
+                    // "Hareketi Azalt": harf harf yazma animasyonu yerine ifade tek seferde görünür
                     guard !Task.isCancelled else { return }
-                    inputText.append(character)
-                    try? await Task.sleep(for: .milliseconds(85))
+                    inputText = phrase
+                } else {
+                    for character in phrase {
+                        guard !Task.isCancelled else { return }
+                        inputText.append(character)
+                        try? await Task.sleep(for: .milliseconds(85))
+                    }
                 }
                 try? await Task.sleep(for: .milliseconds(500))
                 guard !Task.isCancelled, let parsed = ExpenseParser.parse(inputText) else { return }
@@ -648,7 +669,7 @@ struct ExpenseRowView: View {
         if let card {
             parts.append(card.pillTitle)
         } else if !expense.category.isIncome {
-            parts.append(L("Nakit", "Cash"))
+            parts.append(PaymentCard.cashShortTitle)
         }
         // Tahmini kayıtlarda saat anlamsız; gün gösterilir.
         parts.append(isProjected ? KurusDate.shortDay(expense.date) : KurusDate.time(expense.date))
@@ -725,8 +746,12 @@ struct CategoryPickerSheet: View {
 // MARK: - "Silindi — Geri Al" bildirimi
 
 struct UndoToastState: Equatable {
+    enum Kind: Equatable { case saved, deleted }
+
     let id = UUID()
+    var kind: Kind = .deleted
     let title: String
+    /// .deleted → geri yüklenecek kayıtlar · .saved → geri alınınca silinecek yeni kayıtlar
     let removed: [Expense]
 }
 
@@ -736,13 +761,14 @@ struct UndoToast: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "trash.fill")
+            Image(systemName: state.kind == .saved ? "checkmark.circle.fill" : "trash.fill")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Theme.coral)
-            Text(L("Silindi", "Deleted"))
+                .foregroundStyle(state.kind == .saved ? Theme.emerald : Theme.coral)
+                .accessibilityHidden(true)
+            Text(state.kind == .saved ? L("Kaydedildi", "Saved") : L("Silindi", "Deleted"))
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.textPrimary)
-            Text("— \(state.title)")
+            Text("• \(state.title)")
                 .font(.system(size: 15))
                 .foregroundStyle(Theme.textSecondary)
                 .lineLimit(1)

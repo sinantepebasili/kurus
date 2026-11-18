@@ -87,6 +87,11 @@ enum ExpenseCategory: String, Codable, CaseIterable, Identifiable, Sendable {
 // MARK: - Kart
 
 struct PaymentCard: Codable, Identifiable, Hashable, Sendable {
+    /// Kartsız harcamaların havuzu. Banka (debit) kartı harcamaları hesap kesimine tabi olmadığı
+    /// için burada izlenir; etiket gerçek dünyadaki karşılığını söyler (Heuristic #2).
+    static var cashTitle: String { L("Nakit / Banka Kartı", "Cash / Debit") }
+    static var cashShortTitle: String { L("Nakit", "Cash") }
+
     /// Kalıcı, benzersiz kimlik. Yeni kartlar `UUID().uuidString` alır; ad değişse de, iki kart aynı
     /// adı taşısa da tüm güncellemeler (ad, hesap kesim günü) yalnızca bu kimlikle yapılır.
     /// (Eski sürümlerden gelen "card-4532" / "bank-bonus" biçimli kimlikler aynen geçerli kalır.)
@@ -215,6 +220,8 @@ struct UpcomingPayment: Identifiable, Hashable, Sendable {
     let brandID: String?
     let category: ExpenseCategory
     let kind: Kind
+    /// Hesap kesimi satırları için kartın kimliği (basılı tutunca kart düzenleme açılır)
+    var cardID: String? = nil
 
     var brand: Brand? { brandID.flatMap(BrandEngine.brand(id:)) }
 }
@@ -427,7 +434,8 @@ enum Ledger {
                 amount: due > 0 ? due : nil,
                 brandID: nil,
                 category: .bills,
-                kind: .statement
+                kind: .statement,
+                cardID: card.id
             ))
         }
 

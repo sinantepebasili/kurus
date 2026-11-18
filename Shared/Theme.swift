@@ -57,8 +57,19 @@ enum Theme {
     static let cardRadius: CGFloat = 20
     static let rowRadius: CGFloat = 16
 
-    // Hareket
-    static var spring: Animation { .spring(response: 0.35, dampingFraction: 0.75) }
+    // Hareket — "Hareketi Azalt" açıksa yay fiziği yerine kısa, sakin bir geçiş (WCAG 2.3.3 / HIG)
+    static var spring: Animation {
+        reduceMotion ? .easeInOut(duration: 0.18) : .spring(response: 0.35, dampingFraction: 0.75)
+    }
+
+    /// Sistem "Hareketi Azalt" tercihi (görünüm dışı kodda da okunabilsin diye UIKit'ten)
+    static var reduceMotion: Bool {
+        #if os(iOS)
+        UIAccessibility.isReduceMotionEnabled
+        #else
+        false
+        #endif
+    }
 }
 
 // MARK: - Zanaat kartı (gölgesiz, 1pt hairline)

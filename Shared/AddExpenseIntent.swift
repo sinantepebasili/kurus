@@ -110,7 +110,7 @@ struct ExpenseSnippetView: View {
 
     private var subtitle: String {
         var parts = [expense.category.title]
-        parts.append(card?.pillTitle ?? L("Nakit", "Cash"))
+        parts.append(card?.pillTitle ?? PaymentCard.cashTitle)
         if let installment = expense.installment { parts.append("\(L("Taksit", "Installment")) \(installment.label)") }
         return parts.joined(separator: " · ")
     }
