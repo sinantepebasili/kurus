@@ -4,8 +4,11 @@
 //
 //  Hedef: App
 //
-//  • Açılışta Transaction.currentEntitlements ile Pro hakkı doğrulanır.
-//  • Transaction.updates arka planda dinlenir (yenileme, iade, Aile Paylaşımı, başka cihazdan alım).
+//  • Açılışta ve her değişiklikte Transaction.currentEntitlements analiz edilir:
+//    aktif plan, bitiş / yenilenme tarihi ve otomatik yenileme (willAutoRenew) dışarı açılır.
+//  • Transaction.updates (yeni alım, yenileme, iade, yükseltme, Aile Paylaşımı) ve
+//    Product.SubscriptionInfo.Status.updates (otomatik yenilemeyi kapatma gibi işlem üretmeyen
+//    değişiklikler) uygulama boyunca dinlenir; StoreManager tekil olduğu için dinleyiciler hep canlıdır.
 //  • Sonuç App Group'a (ProStatus) yazılır; widget ve Kestirmeler anında bilir.
 //  • 3. parti kütüphane yok; yalnızca StoreKit.
 //
@@ -28,11 +31,34 @@ final class StoreManager {
 
         var id: String { rawValue }
 
+        init?(productID: String) {
+            guard let plan = Plan.allCases.first(where: { $0.productID == productID }) else { return nil }
+            self = plan
+        }
+
         var productID: String {
             switch self {
             case .monthly: "com.kurus.app.pro.monthly"
             case .yearly: "com.kurus.app.pro.yearly"
             case .lifetime: "com.kurus.app.pro.lifetime"
+            }
+        }
+
+        /// Ayarlar ekranındaki plan adı
+        var membershipTitle: String {
+            switch self {
+            case .monthly: L("Aylık Pro", "Monthly Pro")
+            case .yearly: L("Yıllık Pro", "Yearly Pro")
+            case .lifetime: L("Ömür Boyu Pro", "Lifetime Pro")
+            }
+        }
+
+        /// Birden fazla hak varsa (ör. yıllık + ömür boyu) en kapsamlısı gösterilir
+        var rank: Int {
+            switch self {
+            case .lifetime: 3
+            case .yearly: 2
+            case .monthly: 1
             }
         }
 
@@ -59,20 +85,58 @@ final class StoreManager {
         static var productIDs: Set<String> { Set(allCases.map(\.productID)) }
     }
 
-    // MARK: - Durum
+    /// "Satın Alımları Geri Yükle" işleminin durumu (Paywall ve Ayarlar gösterir)
+    enum RestoreState: Equatable {
+        case idle
+        case restoring
+        case restored
+        case nothingToRestore
+        case failed(String)
+
+        var message: String? {
+            switch self {
+            case .idle, .restoring: nil
+            case .restored: L("Satın alımların geri yüklendi.", "Your purchases were restored.")
+            case .nothingToRestore: L("Geri yüklenecek bir satın alma bulunamadı.", "No purchases to restore were found.")
+            case .failed(let reason): reason
+            }
+        }
+
+        var isError: Bool {
+            switch self {
+            case .nothingToRestore, .failed: true
+            default: false
+            }
+        }
+    }
+
+    // MARK: - Dışa açık durum
+
+    /// Aktif plan; `nil` → Ücretsiz
+    private(set) var activePlan: Plan?
+    /// Aylık / Yıllık: mevcut dönemin bitişi (yenilenme ya da sona erme tarihi). Ömür boyu: `nil`
+    private(set) var expirationDate: Date?
+    /// Otomatik yenileme açık mı? `false` → kullanıcı iptal etti, `expirationDate`'te sona erer.
+    /// `nil` → bilinmiyor ya da ömür boyu.
+    private(set) var willAutoRenew: Bool?
 
     private(set) var isPro: Bool
     private(set) var products: [String: Product] = [:]
     private(set) var isPurchasing = false
-    private(set) var isRestoring = false
+    private(set) var restoreState: RestoreState = .idle
     var lastError: String?
 
-    @ObservationIgnored private var updatesTask: Task<Void, Never>?
+    var isRestoring: Bool { restoreState == .restoring }
+
+    @ObservationIgnored private var transactionUpdates: Task<Void, Never>?
+    @ObservationIgnored private var statusUpdates: Task<Void, Never>?
 
     private init() {
         // Doğrulama bitene kadar son bilinen durumla başla (açılışta kilit titremesin)
         isPro = ProStatus.isPro
-        updatesTask = listenForTransactions()
+        activePlan = ProStatus.cachedPlanID.flatMap(Plan.init(productID:))
+        transactionUpdates = listenForTransactions()
+        statusUpdates = listenForSubscriptionStatus()
         Task {
             await loadProducts()
             await refreshEntitlements()
@@ -105,38 +169,85 @@ final class StoreManager {
             products = Dictionary(uniqueKeysWithValues: loaded.map { ($0.id, $0) })
         } catch {
             // Çevrimdışı ya da App Store Connect'te ürün yok: yedek fiyatlar gösterilir.
-            lastError = nil
         }
     }
 
     // MARK: - Haklar
 
-    /// Aktif abonelik ya da ömür boyu alım var mı? Yalnızca doğrulanmış (JWS) işlemler sayılır.
+    /// Aktif hakları analiz eder. Yalnızca doğrulanmış (JWS), iade edilmemiş ve süresi dolmamış
+    /// işlemler sayılır. Birden fazla hak varsa en kapsamlı plan seçilir.
     func refreshEntitlements() async {
-        var active = false
+        var best: (plan: Plan, transaction: Transaction)?
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result,
-                  Plan.productIDs.contains(transaction.productID),
+                  let plan = Plan(productID: transaction.productID),
                   transaction.revocationDate == nil else { continue }
             if let expiration = transaction.expirationDate, expiration < .now { continue }
-            active = true
+            if best == nil || plan.rank > best!.plan.rank {
+                best = (plan, transaction)
+            }
         }
-        setPro(active)
+
+        guard let best else {
+            apply(plan: nil, expiration: nil, autoRenew: nil)
+            return
+        }
+
+        if best.plan.isSubscription {
+            let autoRenew = await autoRenewStatus(for: best.transaction)
+            apply(plan: best.plan, expiration: best.transaction.expirationDate, autoRenew: autoRenew)
+        } else {
+            apply(plan: best.plan, expiration: nil, autoRenew: nil)
+        }
     }
 
-    private func setPro(_ value: Bool) {
-        let changed = isPro != value || ProStatus.isPro != value
-        isPro = value
-        ProStatus.set(value)
+    /// Product.SubscriptionInfo.Status → RenewalInfo.willAutoRenew
+    private func autoRenewStatus(for transaction: Transaction) async -> Bool? {
+        if products[transaction.productID] == nil { await loadProducts() }
+        guard let subscription = products[transaction.productID]?.subscription,
+              let statuses = try? await subscription.status else { return nil }
+
+        // Önce bu işlemin zincirine (originalID) ait durum
+        for status in statuses {
+            guard case .verified(let renewal) = status.renewalInfo,
+                  case .verified(let current) = status.transaction,
+                  current.originalID == transaction.originalID else { continue }
+            return renewal.willAutoRenew
+        }
+        // Tek abonelik grubu: ilk doğrulanmış durum
+        for status in statuses {
+            if case .verified(let renewal) = status.renewalInfo { return renewal.willAutoRenew }
+        }
+        return nil
+    }
+
+    private func apply(plan: Plan?, expiration: Date?, autoRenew: Bool?) {
+        let isNowPro = plan != nil
+        let changed = isPro != isNowPro || ProStatus.isPro != isNowPro
+        activePlan = plan
+        expirationDate = expiration
+        willAutoRenew = autoRenew
+        isPro = isNowPro
+        ProStatus.set(isNowPro, planID: plan?.productID)
         if changed { WidgetCenter.shared.reloadAllTimelines() }
     }
 
+    /// Yeni alım, yenileme, iade, yükseltme / düşürme, Aile Paylaşımı, başka cihazdan alım
     private func listenForTransactions() -> Task<Void, Never> {
         Task.detached { [weak self] in
             for await result in Transaction.updates {
                 if case .verified(let transaction) = result {
                     await transaction.finish()
                 }
+                await self?.refreshEntitlements()
+            }
+        }
+    }
+
+    /// Otomatik yenilemeyi kapatma / açma, faturalama sorunu, ek süre gibi işlem üretmeyen değişiklikler
+    private func listenForSubscriptionStatus() -> Task<Void, Never> {
+        Task.detached { [weak self] in
+            for await _ in Product.SubscriptionInfo.Status.updates {
                 await self?.refreshEntitlements()
             }
         }
@@ -185,19 +296,32 @@ final class StoreManager {
         }
     }
 
-    /// "Satın Alımları Geri Yükle" — App Store Review zorunluluğu
+    // MARK: - Geri yükleme
+
+    /// "Satın Alımları Geri Yükle" — App Store Review Kılavuzu 3.1.1 zorunluluğu.
+    /// AppStore.sync() Apple Hesabı şifresi isteyebilir; yalnızca kullanıcı dokununca çağrılmalı.
     func restorePurchases() async {
+        guard restoreState != .restoring else { return }
         lastError = nil
-        isRestoring = true
-        defer { isRestoring = false }
+        restoreState = .restoring
         do {
             try await AppStore.sync()
+        } catch StoreKitError.userCancelled {
+            restoreState = .idle
+            return
         } catch {
-            lastError = error.localizedDescription
+            await refreshEntitlements()
+            restoreState = .failed(error.localizedDescription)
+            lastError = restoreState.message
+            return
         }
         await refreshEntitlements()
-        if !isPro, lastError == nil {
-            lastError = L("Geri yüklenecek bir satın alma bulunamadı.", "No purchases to restore were found.")
-        }
+        restoreState = isPro ? .restored : .nothingToRestore
+        if !isPro { lastError = restoreState.message }
+    }
+
+    /// Sayfa kapanınca eski geri yükleme mesajı kalmasın
+    func clearRestoreState() {
+        if restoreState != .restoring { restoreState = .idle }
     }
 }

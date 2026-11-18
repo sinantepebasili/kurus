@@ -38,6 +38,17 @@ Satın alma Apple'ın yerel **StoreKit 2** çerçevesiyle yapılır; 3. parti k�
 - **Yedek fiyatlar:** Gerçek fiyatlar `Product.displayPrice`'tan gelir. Yedek fiyatlar yalnızca ürünler yüklenemezse gösterilir.
 - **`App/PaywallView.swift`:** Varsayılan plan Ömür Boyu. En altta Geri Yükle, [Kullanım Koşulları](https://www.apple.com/legal/internet-services/itunes/dev/stdeula/) (Apple standart EULA) ve [Gizlilik Politikası](PRIVACY.md) bağlantıları var.
 
+**Ayarlar & Abonelik** (`App/SettingsSheetView.swift`, sağ üst menü › *Ayarlar & Abonelik*):
+- **Üyelik Durumu:**
+  - Aktif plan: Aylık Pro, Yıllık Pro, Ömür Boyu Pro ya da Ücretsiz.
+  - Yenilenme ya da sona erme tarihi: `RenewalInfo.willAutoRenew` açıksa "… tarihinde yenilenecek", kapalıysa "… tarihinde sona erecek".
+  - Abonelikte **Aboneliği Yönet / İptal Et** (`.manageSubscriptionsSheet`), ücretsiz planda **Pro'ya Geç**, her durumda **Satın Alımları Geri Yükle**.
+- **Veri Yönetimi › Tüm Verileri Sıfırla:**
+  - Onay sorduktan sonra harcamaları, kartları ve bütçeyi bu cihazdan ve iCloud'dan siler (`SharedExpenseStore.resetAllData()`).
+  - Uygulama SwiftData kullanmıyor; veri App Group `UserDefaults` + iCloud anahtar-değer deposunda tek bir `KurusSnapshot` olarak tutuluyor. Boş anlık görüntü en yeni zaman damgasıyla yazıldığı için iCloud'a bağlı diğer cihazlar da boşalır.
+  - Pro satın alımı Apple'da olduğu için etkilenmez.
+- **Yasal:** Gizlilik Politikası, Apple Standart EULA ve sürüm/build (`v1.0 (1)`).
+
 **App Store Connect'te elle yapılacaklar:**
 1. *Business › Agreements* altında **Paid Applications** sözleşmesini imzalayın; banka ve vergi bilgilerini doldurun. Bu adım tamamlanmadan ürünler yüklenmez.
 2. *Uygulamanız › Subscriptions* altında bir abonelik grubu (ör. "Pro") oluşturun. Yıllık ve aylık abonelikleri yukarıdaki kimliklerle ekleyin; yıllığı daha üst seviye yapın.

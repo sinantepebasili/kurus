@@ -23,7 +23,6 @@ struct PaywallView: View {
 
     @Environment(StoreManager.self) private var store
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
 
     @State private var selected: StoreManager.Plan = .lifetime
     /// Kısa ekran (iPhone SE): özellik satırları ve üst boşluk biraz daha sıkılaşır
@@ -68,6 +67,7 @@ struct PaywallView: View {
         .task {
             if store.products.isEmpty { await store.loadProducts() }
         }
+        .onDisappear { store.clearRestoreState() }
     }
 
     // MARK: - Üst bölüm
@@ -310,23 +310,8 @@ struct PaywallView: View {
             .buttonStyle(SpringPressStyle())
             .disabled(store.isPurchasing || store.isRestoring)
 
-            HStack(spacing: 6) {
-                Button {
-                    Task { await store.restorePurchases() }
-                } label: {
-                    Text(store.isRestoring ? L("Geri yükleniyor…", "Restoring…") : L("Satın Alımları Geri Yükle", "Restore Purchases"))
-                }
-                .disabled(store.isRestoring || store.isPurchasing)
-                Text("·")
-                Button(L("Kullanım Koşulları", "Terms of Use")) { openURL(LegalLinks.terms) }
-                Text("·")
-                Button(L("Gizlilik Politikası", "Privacy Policy")) { openURL(LegalLinks.privacy) }
-            }
-            .font(.system(size: 11.5, weight: .medium))
-            .foregroundStyle(Theme.textSecondary)
-            .buttonStyle(.plain)
-            .lineLimit(1)
-            .minimumScaleFactor(0.7)
+            // App Store Review 3.1.1 / 3.1.2: geri yükleme, gizlilik politikası ve EULA her zaman erişilebilir
+            LegalFooterLinks()
         }
         .padding(.horizontal, Theme.gutter)
         .padding(.top, 10)
@@ -360,5 +345,43 @@ struct SpringPressStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .opacity(configuration.isPressed ? 0.9 : 1)
             .animation(Theme.spring, value: configuration.isPressed)
+    }
+}
+
+/// Paywall ve Ayarlar'da ortak, kompakt yasal satır:
+/// Satın Alımları Geri Yükle · Gizlilik Politikası · Kullanım Koşulları (EULA)
+struct LegalFooterLinks: View {
+    @Environment(StoreManager.self) private var store
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button {
+                Task { await store.restorePurchases() }
+            } label: {
+                HStack(spacing: 4) {
+                    if store.isRestoring {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .tint(Theme.textSecondary)
+                    }
+                    Text(L("Satın Alımları Geri Yükle", "Restore Purchases"))
+                }
+            }
+            .disabled(store.isRestoring || store.isPurchasing)
+
+            Text("·")
+
+            Link(L("Gizlilik Politikası", "Privacy Policy"), destination: LegalLinks.privacy)
+
+            Text("·")
+
+            Link(L("Kullanım Koşulları (EULA)", "Terms of Use (EULA)"), destination: LegalLinks.terms)
+        }
+        .font(.footnote)
+        .foregroundStyle(Theme.textSecondary)
+        .tint(Theme.textSecondary)
+        .buttonStyle(.plain)
+        .lineLimit(1)
+        .minimumScaleFactor(0.6)
     }
 }

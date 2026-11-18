@@ -22,6 +22,7 @@ struct ContentView: View {
     @State private var selectedMonth = Ledger.startOfMonth(.now)
 
     @State private var showGuide = false
+    @State private var showSettings = false
     @State private var categoryTarget: Expense?
     /// Pro kilidine takılan özellik → PaywallView (ilgili satır vurgulu)
     @State private var paywallFeature: ProFeature?
@@ -153,6 +154,17 @@ struct ContentView: View {
             AutomationGuideSheet()
                 .environment(storeManager)
         }
+        .sheet(isPresented: $showSettings) {
+            SettingsSheetView()
+                .environment(store)
+                .environment(storeManager)
+        }
+        .onChange(of: store.cards) { _, cards in
+            // Veri sıfırlandıysa ya da kart artık yoksa filtre "Tümü"ne döner
+            if case .card(let id) = filter, !cards.contains(where: { $0.id == id }) {
+                withAnimation(Theme.spring) { filter = .all }
+            }
+        }
         .sheet(item: $paywallFeature) { feature in
             PaywallView(feature: feature)
                 .environment(storeManager)
@@ -202,6 +214,12 @@ struct ContentView: View {
             .accessibilityLabel(isPrivate ? L("Tutarları göster", "Show amounts") : L("Tutarları gizle", "Hide amounts"))
 
             Menu {
+                Button {
+                    showSettings = true
+                } label: {
+                    Label(L("Ayarlar & Abonelik", "Settings & Subscription"), systemImage: "gearshape")
+                }
+
                 if !storeManager.isPro {
                     Button {
                         paywallFeature = .general

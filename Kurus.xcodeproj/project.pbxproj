@@ -119,6 +119,10 @@
 			isa = PBXBuildFile;
 			fileRef = 0365672E26E54D87A9D1F001;
 		};
+		A917B23F6D5149E3FDA943BB /* SettingsSheetView.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = 8C7EED3B746EE2B5F73CC154;
+		};
 		B0DE71084610286273EEC49B /* ProStatus.swift in Sources */ = {
 			isa = PBXBuildFile;
 			fileRef = 2A0A7DC07F9232F9DFDF3F44;
@@ -315,6 +319,12 @@
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
 			path = BrandEngine.swift;
+			sourceTree = "<group>";
+		};
+		8C7EED3B746EE2B5F73CC154 /* SettingsSheetView.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = SettingsSheetView.swift;
 			sourceTree = "<group>";
 		};
 		94F5BDE443E50ABAF5C1ACAE /* ExpenseParser.swift */ = {
@@ -522,6 +532,7 @@
 				BDB0FD55639C02365AEDFBBC,
 				E5A54F41E88FA99795F63D9C,
 				0E7FD68C11E4734E6719D1FB,
+				8C7EED3B746EE2B5F73CC154,
 				AE91E4A2F27199611E1133D6,
 				D59B301BE12A39FF7C501E5C,
 				53D7135E4646663BBC2E10DE,
@@ -666,6 +677,7 @@
 				9FD66F03F7BD3D04981026B3,
 				245EBDA653D6C43BA9ABEFC7,
 				EBFD0EB432592E9A8B043553,
+				A917B23F6D5149E3FDA943BB,
 				0DF714FA2CFF3303A8CF7BCE,
 				3E2D00AEE8B7781E7E437263,
 				B0DE71084610286273EEC49B,

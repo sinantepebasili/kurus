@@ -163,6 +163,17 @@ final class SharedExpenseStore {
         }
     }
 
+    /// "Tüm Verileri Sıfırla": harcamalar, kartlar ve bütçe bu cihazdan VE iCloud'dan silinir.
+    /// Boş anlık görüntü en yeni `updatedAt` ile yazılır; iCloud'a bağlı diğer cihazlar da
+    /// "son yazan kazanır" kuralıyla boş duruma geçer. Pro satın alımı Apple'da olduğu için etkilenmez.
+    func resetAllData() {
+        var empty = KurusSnapshot()
+        empty.hasCompletedOnboarding = true   // açılış demosu yeniden oynamasın
+        empty.updatedAt = .now
+        snapshot = empty
+        persist()
+    }
+
     /// Uygulama öne geldiğinde: widget/Kestirme yazdıysa diskteki yeni veriyi al, iCloud'u eşitle.
     func reloadFromDisk() {
         if let disk = Self.decode(defaults.data(forKey: Self.snapshotKey)), disk.updatedAt > snapshot.updatedAt {

@@ -24,8 +24,20 @@ enum ProStatus {
         defaults?.bool(forKey: key) ?? false
     }
 
-    static func set(_ value: Bool) {
+    static let planKey = "proPlanProductID"
+
+    /// Son doğrulanmış planın ürün kimliği (açılışta Ayarlar'ın doğru planı hemen göstermesi için)
+    static var cachedPlanID: String? {
+        defaults?.string(forKey: planKey)
+    }
+
+    static func set(_ value: Bool, planID: String? = nil) {
         defaults?.set(value, forKey: key)
+        if let planID, value {
+            defaults?.set(planID, forKey: planKey)
+        } else {
+            defaults?.removeObject(forKey: planKey)
+        }
     }
 
     /// Ücretsiz planda izin verilen kart sayısı (nakit sayılmaz)
